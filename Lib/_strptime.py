@@ -17,6 +17,7 @@ from re import compile as re_compile
 from re import IGNORECASE
 from re import escape as re_escape
 from datetime import (date as datetime_date,
+                      datetime as datetime_datetime,
                       timedelta as datetime_timedelta,
                       timezone as datetime_timezone)
 from _thread import allocate_lock as _thread_allocate_lock
@@ -307,9 +308,9 @@ def _calc_julian_from_V(iso_year, iso_week, iso_weekday):
 
 
 def _strptime(data_string, format="%a %b %d %H:%M:%S %Y"):
-    """Return a 2-tuple consisting of a time struct and an int containing
+    """Return a 3-tuple consisting of a time struct and an int containing
     the number of microseconds based on the input string and the
-    format string."""
+    format string, and the UTC offset."""
 
     for index, arg in enumerate([data_string, format]):
         if not isinstance(arg, str):
@@ -556,6 +557,10 @@ def _strptime(data_string, format="%a %b %d %H:%M:%S %Y"):
             hour, minute, second,
             weekday, julian, tz, tzname, gmtoff), fraction, gmtoff_fraction
 
+date_specs = ('%a', '%A', '%b', '%B', '%c', '%d', '%j', '%m', '%U', '%G',
+              '%u', '%V', '%w', '%W', '%x', '%y', '%Y', '%G', '%u', '%V',)
+time_specs = ('%H', '%I', '%M', '%S', '%f',)
+
 def _strptime_time(data_string, format="%a %b %d %H:%M:%S %Y"):
     """Return a time struct based on the input string and the
     format string."""
@@ -577,3 +582,19 @@ def _strptime_datetime(cls, data_string, format="%a %b %d %H:%M:%S %Y"):
         args += (tz,)
 
     return cls(*args)
+
+def _strptime_datetime_date(data_string, format):
+    """Return a date based on the input string and the format string."""
+    msg = "'{!s}' {} not valid in date format specification."
+    from _datetime import _check_invalid_datetime_specs
+    if _check_invalid_datetime_specs(format, time_specs, msg):
+        _date = _strptime_datetime(datetime_datetime, data_string, format)
+        return _date.date()
+
+def _strptime_datetime_time(data_string, format):
+    """Return a time based on the input string and the format string."""
+    msg = "'{!s}' {} not valid in time format specification."
+    from _datetime import _check_invalid_datetime_specs
+    if _check_invalid_datetime_specs(format, date_specs, msg):
+        _time = _strptime_datetime(datetime_datetime, data_string, format)
+        return _time.time()

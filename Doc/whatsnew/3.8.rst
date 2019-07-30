@@ -492,6 +492,15 @@ fails. The exception is ignored silently by default in release build.
 (Contributed by Victor Stinner in :issue:`18748`.)
 
 
+datetime
+--------
+
+Added :func:`~datetime.date.strptime` and :func:`~datetime.time.strptime`.
+(Patch by Alexander Belopolsky, Amaury Forgeot d'Arc, Berker Peksag, Josh-sf,
+Juraez Bochi, Maciej Szulik, Matheus Vieira Portela. Contributed by Stéphane
+Wirtel)
+
+
 gc
 --
 
