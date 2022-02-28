@@ -1346,6 +1346,9 @@ Add option to create MPTCP sockets with ``IPPROTO_MPTCP``
 Add ``IP_RECVTOS`` option to receive the type of service (ToS) or DSCP/ECN fields
 (Contributed by Georg Sauthoff in :issue:`44077`.)
 
+Add constants for IsoTp CAN protocol.
+(Contributed by Patrick Menschel and Stefan Tatschner in :issue:`42653`.)
+
 ssl
 ---
 
