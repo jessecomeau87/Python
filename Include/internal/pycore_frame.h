@@ -194,12 +194,11 @@ static inline bool
 _PyThreadState_HasStackSpace(PyThreadState *tstate, int size)
 {
     assert(
-        (tstate->datastack_top == NULL && tstate->datastack_limit == NULL)
+        (tstate->frame_stack.limit == NULL && tstate->frame_stack.free <= 0)
         ||
-        (tstate->datastack_top != NULL && tstate->datastack_limit != NULL)
+        (tstate->frame_stack.limit != NULL && tstate->frame_stack.free >= 0)
     );
-    return tstate->datastack_top != NULL &&
-        size < tstate->datastack_limit - tstate->datastack_top;
+    return size < tstate->frame_stack.free;
 }
 
 extern _PyInterpreterFrame *
@@ -215,9 +214,10 @@ _PyFrame_PushUnchecked(PyThreadState *tstate, PyFunctionObject *func)
 {
     CALL_STAT_INC(frames_pushed);
     PyCodeObject *code = (PyCodeObject *)func->func_code;
-    _PyInterpreterFrame *new_frame = (_PyInterpreterFrame *)tstate->datastack_top;
-    tstate->datastack_top += code->co_framesize;
-    assert(tstate->datastack_top < tstate->datastack_limit);
+    PyObject **top = tstate->frame_stack.limit - tstate->frame_stack.free;
+    _PyInterpreterFrame *new_frame = (_PyInterpreterFrame *)top;
+    tstate->frame_stack.free -= code->co_framesize;
+    assert(top < tstate->frame_stack.limit);
     _PyFrame_InitializeSpecials(new_frame, func, NULL, code);
     return new_frame;
 }

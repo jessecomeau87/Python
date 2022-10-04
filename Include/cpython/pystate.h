@@ -74,10 +74,17 @@ typedef struct _err_stackitem {
 
 typedef struct _stack_chunk {
     struct _stack_chunk *previous;
-    size_t size;
-    size_t top;
+    int size_in_bytes;
+    int free;
     PyObject * data[1]; /* Variable sized */
 } _PyStackChunk;
+
+typedef struct _frame_stack {
+    _PyStackChunk *current_chunk;
+    PyObject **limit;
+    int free;
+    int chunk_size;
+} _PyFrameStack;
 
 struct _ts {
     /* See Python/ceval.c for comments explaining most fields */
@@ -178,10 +185,7 @@ struct _ts {
     uint64_t id;
 
     PyTraceInfo trace_info;
-
-    _PyStackChunk *datastack_chunk;
-    PyObject **datastack_top;
-    PyObject **datastack_limit;
+    _PyFrameStack frame_stack;
     /* XXX signal handlers should also be here */
 
     /* The following fields are here to avoid allocation during init.
@@ -367,3 +371,16 @@ typedef int (*crossinterpdatafunc)(PyObject *, _PyCrossInterpreterData *);
 
 PyAPI_FUNC(int) _PyCrossInterpreterData_RegisterClass(PyTypeObject *, crossinterpdatafunc);
 PyAPI_FUNC(crossinterpdatafunc) _PyCrossInterpreterData_Lookup(PyObject *);
+
+/* UNSTABLE API for stackful coroutines.
+ * It it the responsibility of the caller to manage the memory for the _PyFrameStack struct.
+ * The memory for the actual frame stack will be managed by the VM.
+ * All functions need the GIL to be held.
+ */
+
+/* Initialize fs with given chunk size */
+PyAPI_FUNC(void) _PyFrameStack_Init(_PyFrameStack *fs, int chunk_size);
+/* Swap the frame stack of the current thread with fs */
+PyAPI_FUNC(void) _PyFrameStack_Swap(_PyFrameStack *fs);
+/* Free any allocated memory chunks for fs. */
+PyAPI_FUNC(void) _PyFrameStack_Clear(_PyFrameStack *fs);
