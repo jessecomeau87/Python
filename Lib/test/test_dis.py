@@ -200,6 +200,26 @@ dis_bug42562 = """\
        RETURN_VALUE
 """
 
+
+def bug45191():
+    obj \
+        .m(*[a])
+
+
+dis_bug45191 = """\
+%3d           0 LOAD_GLOBAL              0 (obj)
+
+%3d           2 LOAD_ATTR                1 (m)
+              4 LOAD_GLOBAL              2 (a)
+              6 BUILD_LIST               1
+              8 CALL_FUNCTION_EX         0
+             10 POP_TOP
+             12 LOAD_CONST               0 (None)
+             14 RETURN_VALUE
+""" % (bug45191.__code__.co_firstlineno + 1,
+       bug45191.__code__.co_firstlineno + 2)
+
+
 # Extended arg followed by NOP
 code_bug_45757 = bytes([
         0x90, 0x01,  # EXTENDED_ARG 0x01
@@ -914,6 +934,9 @@ class DisTests(DisTestBase):
 
     def test_bug_42562(self):
         self.do_disassembly_test(bug42562, dis_bug42562)
+
+    def test_bug_45191(self):
+        self.do_disassembly_test(bug45191, dis_bug45191)
 
     def test_bug_45757(self):
         # Extended arg followed by NOP
