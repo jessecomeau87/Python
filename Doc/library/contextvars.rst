@@ -144,21 +144,79 @@ Manual Context Management
    To get a copy of the current context use the
    :func:`~contextvars.copy_context` function.
 
-   Every thread will have a different top-level :class:`~contextvars.Context`
-   object. This means that a :class:`ContextVar` object behaves in a similar
-   fashion to :func:`threading.local()` when values are assigned in different
-   threads.
+   Each thread has its own effective stack of :class:`~contextvars.Context`
+   objects.  The *current Context* is the Context object at the top of the
+   current thread's stack.  All Context objects in the stacks are considered to
+   be *entered*.  *Entering* a Context, either by calling the
+   :meth:`Context.run` method or using the Context object as a :term:`context
+   manager`, pushes the Context onto the top of the current thread's stack,
+   making it the current Context.  *Exiting* from the current Context, either by
+   returning from the callback passed to :meth:`Context.run` or by exiting the
+   :keyword:`with` statement suite, pops the Context off of the top of the
+   stack, restoring the current Context to what it was before.
+
+   Because each thread has its own Context stack, :class:`ContextVar` objects
+   behave in a similar fashion to :func:`threading.local()` when values are
+   assigned in different threads.
+
+   Attempting to do either of the following will raise a :exc:`RuntimeError`:
+
+   * Entering an already entered Context.  (This includes Contexts entered in
+     other threads.)
+   * Exiting from a Context that is not the current Context.
+
+   After exiting a Context, it can later be re-entered (from any thread).
+
+   Any changes to :class:`ContextVar` values via the :meth:`ContextVar.set`
+   method are recorded in the current Context.  The :meth:`ContextVar.get`
+   method returns the value associated with the current Context.  Thus, exiting
+   a Context effectively reverts any changes made to context variables while the
+   Context was entered.  (If desired, the values can be restored by re-entering
+   the Context.)
 
    Context implements the :class:`collections.abc.Mapping` interface.
 
+   .. versionadded:: 3.12
+      A Context object can be used as a :term:`context manager`.  The
+      :meth:`Context.__enter__` and :meth:`Context.__exit__` methods
+      (automatically called by the :keyword:`with` statement) enters and exits
+      the Context, respectively.  The value returned from
+      :meth:`Context.__enter__`, and thus bound to the identifier given in the
+      :keyword:`with` statement's :keyword:`!as` clause if present, is the
+      Context object itself.
+
+   Example:
+
+   .. testcode::
+
+      import contextvars
+
+      var = contextvars.ContextVar("var")
+      var.set("initial")
+
+      # Copy the current Context and enter it.
+      with contextvars.copy_context() as ctx:
+          var.set("updated")
+          assert var in ctx
+          assert ctx[var] == "updated"
+          assert var.get() == "updated"
+
+      # Exited ctx, so the value of var should have reverted.
+      assert var.get() == "initial"
+      # But the updated value is still recorded in ctx.
+      assert ctx[var] == "updated"
+
+      # Re-entering ctx should restore the updated value of var.
+      with ctx:
+          assert var.get() == "updated"
+
    .. method:: run(callable, *args, **kwargs)
 
-      Execute ``callable(*args, **kwargs)`` code in the context object
-      the *run* method is called on.  Return the result of the execution
-      or propagate an exception if one occurred.
+      Enters the Context, executes ``callable(*args, **kwargs)``, then exits the
+      Context.  Returns *callable*'s return value, or propagates an exception if
+      one occurred.
 
-      Any changes to any context variables that *callable* makes will
-      be contained in the context object::
+      Example::
 
         var = ContextVar('var')
         var.set('spam')
@@ -185,10 +243,6 @@ Manual Context Management
 
         # However, outside of 'ctx', 'var' is still set to 'spam':
         # var.get() == 'spam'
-
-      The method raises a :exc:`RuntimeError` when called on the same
-      context object from more than one OS thread, or when called
-      recursively.
 
    .. method:: copy()
 
