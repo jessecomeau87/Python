@@ -2,6 +2,10 @@
 #  error "this header file must not be included directly"
 #endif
 
+/* Py_FrozenMain is kept out of the Limited API until documented and present
+   in all builds of Python */
+PyAPI_FUNC(int) Py_FrozenMain(int argc, char **argv);
+
 /* Only used by applications that embed the interpreter and need to
  * override the standard encoding determination mechanism
  */
@@ -58,4 +62,10 @@ PyAPI_FUNC(int) _Py_CoerceLegacyLocale(int warn);
 PyAPI_FUNC(int) _Py_LegacyLocaleDetected(int warn);
 PyAPI_FUNC(char *) _Py_SetLocaleFromEnv(int category);
 
-PyAPI_FUNC(PyThreadState *) _Py_NewInterpreter(int isolated_subinterpreter);
+PyAPI_FUNC(PyStatus) _Py_NewInterpreterFromConfig(
+    PyThreadState **tstate_p,
+    const _PyInterpreterConfig *config);
+
+typedef void (*atexit_datacallbackfunc)(void *);
+PyAPI_FUNC(int) _Py_AtExit(
+        PyInterpreterState *, atexit_datacallbackfunc, void *);
