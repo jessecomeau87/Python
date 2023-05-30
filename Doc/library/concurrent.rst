@@ -5,4 +5,4 @@ Currently, there is only one module in this package:
 
 .. toctree::
      
-    concurrent.futures.rst 
+    concurrent.futures.rst
