@@ -1,0 +1,1 @@
+virtualenv bin/activate scropt no longer exports PS1
