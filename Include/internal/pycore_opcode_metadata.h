@@ -27,59 +27,65 @@
 
 #define _EXIT_TRACE 300
 #define _SET_IP 301
-#define _GUARD_BOTH_INT 302
-#define _BINARY_OP_MULTIPLY_INT 303
-#define _BINARY_OP_ADD_INT 304
-#define _BINARY_OP_SUBTRACT_INT 305
-#define _GUARD_BOTH_FLOAT 306
-#define _BINARY_OP_MULTIPLY_FLOAT 307
-#define _BINARY_OP_ADD_FLOAT 308
-#define _BINARY_OP_SUBTRACT_FLOAT 309
-#define _GUARD_BOTH_UNICODE 310
-#define _BINARY_OP_ADD_UNICODE 311
-#define _BINARY_OP_INPLACE_ADD_UNICODE 312
-#define _POP_FRAME 313
-#define _GUARD_GLOBALS_VERSION 314
-#define _GUARD_BUILTINS_VERSION 315
-#define _LOAD_GLOBAL_MODULE 316
-#define _LOAD_GLOBAL_BUILTINS 317
-#define _GUARD_TYPE_VERSION 318
-#define _CHECK_MANAGED_OBJECT_HAS_VALUES 319
-#define _LOAD_ATTR_INSTANCE_VALUE 320
-#define _LOAD_ATTR_SLOT 321
-#define _GUARD_DORV_VALUES 322
-#define _STORE_ATTR_INSTANCE_VALUE 323
-#define _GUARD_TYPE_VERSION_STORE 324
-#define _STORE_ATTR_SLOT 325
-#define _IS_NONE 326
-#define _ITER_CHECK_LIST 327
-#define _ITER_JUMP_LIST 328
-#define _IS_ITER_EXHAUSTED_LIST 329
-#define _ITER_NEXT_LIST 330
-#define _ITER_CHECK_TUPLE 331
-#define _ITER_JUMP_TUPLE 332
-#define _IS_ITER_EXHAUSTED_TUPLE 333
-#define _ITER_NEXT_TUPLE 334
-#define _ITER_CHECK_RANGE 335
-#define _ITER_JUMP_RANGE 336
-#define _IS_ITER_EXHAUSTED_RANGE 337
-#define _ITER_NEXT_RANGE 338
-#define _GUARD_DORV_VALUES_INST_ATTR_FROM_DICT 339
-#define _GUARD_KEYS_VERSION 340
-#define _LOAD_ATTR_METHOD_WITH_VALUES 341
-#define _LOAD_ATTR_METHOD_NO_DICT 342
-#define _CHECK_CALL_BOUND_METHOD_EXACT_ARGS 343
-#define _INIT_CALL_BOUND_METHOD_EXACT_ARGS 344
-#define _CHECK_PEP_523 345
-#define _CHECK_FUNCTION_EXACT_ARGS 346
-#define _CHECK_STACK_SPACE 347
-#define _INIT_CALL_PY_EXACT_ARGS 348
-#define _PUSH_FRAME 349
-#define _POP_JUMP_IF_FALSE 350
-#define _POP_JUMP_IF_TRUE 351
-#define _JUMP_TO_TOP 352
-#define _SAVE_CURRENT_IP 353
-#define _INSERT 354
+#define _END_FOR_MONITOR 302
+#define _END_SEND_MONITOR 303
+#define _GUARD_BOTH_INT 304
+#define _BINARY_OP_MULTIPLY_INT 305
+#define _BINARY_OP_ADD_INT 306
+#define _BINARY_OP_SUBTRACT_INT 307
+#define _GUARD_BOTH_FLOAT 308
+#define _BINARY_OP_MULTIPLY_FLOAT 309
+#define _BINARY_OP_ADD_FLOAT 310
+#define _BINARY_OP_SUBTRACT_FLOAT 311
+#define _GUARD_BOTH_UNICODE 312
+#define _BINARY_OP_ADD_UNICODE 313
+#define _BINARY_OP_INPLACE_ADD_UNICODE 314
+#define _POP_FRAME 315
+#define _MONITOR_RETURN 316
+#define _SUSPEND_GENERATOR 317
+#define _MONITOR_YIELD_VALUE 318
+#define _DO_YIELD 319
+#define _GUARD_GLOBALS_VERSION 320
+#define _GUARD_BUILTINS_VERSION 321
+#define _LOAD_GLOBAL_MODULE 322
+#define _LOAD_GLOBAL_BUILTINS 323
+#define _GUARD_TYPE_VERSION 324
+#define _CHECK_MANAGED_OBJECT_HAS_VALUES 325
+#define _LOAD_ATTR_INSTANCE_VALUE 326
+#define _LOAD_ATTR_SLOT 327
+#define _GUARD_DORV_VALUES 328
+#define _STORE_ATTR_INSTANCE_VALUE 329
+#define _GUARD_TYPE_VERSION_STORE 330
+#define _STORE_ATTR_SLOT 331
+#define _IS_NONE 332
+#define _ITER_CHECK_LIST 333
+#define _ITER_JUMP_LIST 334
+#define _IS_ITER_EXHAUSTED_LIST 335
+#define _ITER_NEXT_LIST 336
+#define _ITER_CHECK_TUPLE 337
+#define _ITER_JUMP_TUPLE 338
+#define _IS_ITER_EXHAUSTED_TUPLE 339
+#define _ITER_NEXT_TUPLE 340
+#define _ITER_CHECK_RANGE 341
+#define _ITER_JUMP_RANGE 342
+#define _IS_ITER_EXHAUSTED_RANGE 343
+#define _ITER_NEXT_RANGE 344
+#define _GUARD_DORV_VALUES_INST_ATTR_FROM_DICT 345
+#define _GUARD_KEYS_VERSION 346
+#define _LOAD_ATTR_METHOD_WITH_VALUES 347
+#define _LOAD_ATTR_METHOD_NO_DICT 348
+#define _CHECK_CALL_BOUND_METHOD_EXACT_ARGS 349
+#define _INIT_CALL_BOUND_METHOD_EXACT_ARGS 350
+#define _CHECK_PEP_523 351
+#define _CHECK_FUNCTION_EXACT_ARGS 352
+#define _CHECK_STACK_SPACE 353
+#define _INIT_CALL_PY_EXACT_ARGS 354
+#define _PUSH_FRAME 355
+#define _POP_JUMP_IF_FALSE 356
+#define _POP_JUMP_IF_TRUE 357
+#define _JUMP_TO_TOP 358
+#define _SAVE_CURRENT_IP 359
+#define _INSERT 360
 
 extern int _PyOpcode_num_popped(int opcode, int oparg, bool jump);
 #ifdef NEED_OPCODE_METADATA
@@ -119,9 +125,13 @@ int _PyOpcode_num_popped(int opcode, int oparg, bool jump)  {
             return 0;
         case END_FOR:
             return 2;
+        case _END_FOR_MONITOR:
+            return 2;
         case INSTRUMENTED_END_FOR:
             return 2;
         case END_SEND:
+            return 2;
+        case _END_SEND_MONITOR:
             return 2;
         case INSTRUMENTED_END_SEND:
             return 2;
@@ -223,6 +233,8 @@ int _PyOpcode_num_popped(int opcode, int oparg, bool jump)  {
             return 1;
         case RETURN_VALUE:
             return 1;
+        case _MONITOR_RETURN:
+            return 1;
         case INSTRUMENTED_RETURN_VALUE:
             return 1;
         case RETURN_CONST:
@@ -239,9 +251,15 @@ int _PyOpcode_num_popped(int opcode, int oparg, bool jump)  {
             return 2;
         case SEND_GEN:
             return 2;
-        case INSTRUMENTED_YIELD_VALUE:
+        case _SUSPEND_GENERATOR:
+            return 1;
+        case _MONITOR_YIELD_VALUE:
+            return 1;
+        case _DO_YIELD:
             return 1;
         case YIELD_VALUE:
+            return 1;
+        case INSTRUMENTED_YIELD_VALUE:
             return 1;
         case POP_EXCEPT:
             return 1;
@@ -677,10 +695,14 @@ int _PyOpcode_num_pushed(int opcode, int oparg, bool jump)  {
             return 1;
         case END_FOR:
             return 0;
+        case _END_FOR_MONITOR:
+            return 2;
         case INSTRUMENTED_END_FOR:
             return 0;
         case END_SEND:
             return 1;
+        case _END_SEND_MONITOR:
+            return 2;
         case INSTRUMENTED_END_SEND:
             return 1;
         case UNARY_NEGATIVE:
@@ -781,6 +803,8 @@ int _PyOpcode_num_pushed(int opcode, int oparg, bool jump)  {
             return 0;
         case RETURN_VALUE:
             return 0;
+        case _MONITOR_RETURN:
+            return 1;
         case INSTRUMENTED_RETURN_VALUE:
             return 0;
         case RETURN_CONST:
@@ -797,9 +821,15 @@ int _PyOpcode_num_pushed(int opcode, int oparg, bool jump)  {
             return 2;
         case SEND_GEN:
             return 2;
-        case INSTRUMENTED_YIELD_VALUE:
+        case _SUSPEND_GENERATOR:
+            return 1;
+        case _MONITOR_YIELD_VALUE:
+            return 1;
+        case _DO_YIELD:
             return 1;
         case YIELD_VALUE:
+            return 1;
+        case INSTRUMENTED_YIELD_VALUE:
             return 1;
         case POP_EXCEPT:
             return 0;
@@ -1281,8 +1311,10 @@ const struct opcode_metadata _PyOpcode_opcode_metadata[OPCODE_METADATA_SIZE] = {
     [POP_TOP] = { true, INSTR_FMT_IX, 0 },
     [PUSH_NULL] = { true, INSTR_FMT_IX, 0 },
     [END_FOR] = { true, INSTR_FMT_IX, 0 },
+    [_END_FOR_MONITOR] = { true, INSTR_FMT_IX, HAS_ERROR_FLAG },
     [INSTRUMENTED_END_FOR] = { true, INSTR_FMT_IX, HAS_ERROR_FLAG },
     [END_SEND] = { true, INSTR_FMT_IX, 0 },
+    [_END_SEND_MONITOR] = { true, INSTR_FMT_IX, HAS_ERROR_FLAG },
     [INSTRUMENTED_END_SEND] = { true, INSTR_FMT_IX, HAS_ERROR_FLAG },
     [UNARY_NEGATIVE] = { true, INSTR_FMT_IX, HAS_ERROR_FLAG },
     [UNARY_NOT] = { true, INSTR_FMT_IX, 0 },
@@ -1333,6 +1365,7 @@ const struct opcode_metadata _PyOpcode_opcode_metadata[OPCODE_METADATA_SIZE] = {
     [INTERPRETER_EXIT] = { true, INSTR_FMT_IX, 0 },
     [_POP_FRAME] = { true, INSTR_FMT_IX, 0 },
     [RETURN_VALUE] = { true, INSTR_FMT_IX, 0 },
+    [_MONITOR_RETURN] = { true, INSTR_FMT_IX, HAS_ERROR_FLAG },
     [INSTRUMENTED_RETURN_VALUE] = { true, INSTR_FMT_IX, HAS_ERROR_FLAG },
     [RETURN_CONST] = { true, INSTR_FMT_IB, HAS_ARG_FLAG | HAS_CONST_FLAG },
     [INSTRUMENTED_RETURN_CONST] = { true, INSTR_FMT_IB, HAS_ARG_FLAG | HAS_CONST_FLAG | HAS_ERROR_FLAG },
@@ -1341,8 +1374,11 @@ const struct opcode_metadata _PyOpcode_opcode_metadata[OPCODE_METADATA_SIZE] = {
     [GET_AWAITABLE] = { true, INSTR_FMT_IB, HAS_ARG_FLAG | HAS_ERROR_FLAG },
     [SEND] = { true, INSTR_FMT_IBC, HAS_ARG_FLAG | HAS_JUMP_FLAG | HAS_ERROR_FLAG },
     [SEND_GEN] = { true, INSTR_FMT_IBC, HAS_ARG_FLAG | HAS_DEOPT_FLAG },
-    [INSTRUMENTED_YIELD_VALUE] = { true, INSTR_FMT_IB, HAS_ARG_FLAG | HAS_ERROR_FLAG },
+    [_SUSPEND_GENERATOR] = { true, INSTR_FMT_IX, 0 },
+    [_MONITOR_YIELD_VALUE] = { true, INSTR_FMT_IX, HAS_ERROR_FLAG },
+    [_DO_YIELD] = { true, INSTR_FMT_IB, HAS_ARG_FLAG },
     [YIELD_VALUE] = { true, INSTR_FMT_IB, HAS_ARG_FLAG },
+    [INSTRUMENTED_YIELD_VALUE] = { true, INSTR_FMT_IB, HAS_ARG_FLAG | HAS_ERROR_FLAG },
     [POP_EXCEPT] = { true, INSTR_FMT_IX, 0 },
     [RERAISE] = { true, INSTR_FMT_IB, HAS_ARG_FLAG | HAS_ERROR_FLAG },
     [END_ASYNC_FOR] = { true, INSTR_FMT_IX, HAS_ERROR_FLAG },
@@ -1692,6 +1728,8 @@ extern const char * const _PyOpcode_uop_name[OPCODE_UOP_NAME_SIZE];
 const char * const _PyOpcode_uop_name[OPCODE_UOP_NAME_SIZE] = {
     [_EXIT_TRACE] = "_EXIT_TRACE",
     [_SET_IP] = "_SET_IP",
+    [_END_FOR_MONITOR] = "_END_FOR_MONITOR",
+    [_END_SEND_MONITOR] = "_END_SEND_MONITOR",
     [_GUARD_BOTH_INT] = "_GUARD_BOTH_INT",
     [_BINARY_OP_MULTIPLY_INT] = "_BINARY_OP_MULTIPLY_INT",
     [_BINARY_OP_ADD_INT] = "_BINARY_OP_ADD_INT",
@@ -1704,6 +1742,10 @@ const char * const _PyOpcode_uop_name[OPCODE_UOP_NAME_SIZE] = {
     [_BINARY_OP_ADD_UNICODE] = "_BINARY_OP_ADD_UNICODE",
     [_BINARY_OP_INPLACE_ADD_UNICODE] = "_BINARY_OP_INPLACE_ADD_UNICODE",
     [_POP_FRAME] = "_POP_FRAME",
+    [_MONITOR_RETURN] = "_MONITOR_RETURN",
+    [_SUSPEND_GENERATOR] = "_SUSPEND_GENERATOR",
+    [_MONITOR_YIELD_VALUE] = "_MONITOR_YIELD_VALUE",
+    [_DO_YIELD] = "_DO_YIELD",
     [_GUARD_GLOBALS_VERSION] = "_GUARD_GLOBALS_VERSION",
     [_GUARD_BUILTINS_VERSION] = "_GUARD_BUILTINS_VERSION",
     [_LOAD_GLOBAL_MODULE] = "_LOAD_GLOBAL_MODULE",
