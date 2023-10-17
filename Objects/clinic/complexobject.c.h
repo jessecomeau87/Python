@@ -156,4 +156,13 @@ skip_optional_pos:
 exit:
     return return_value;
 }
-/*[clinic end generated code: output=002c74f8a33b6697 input=a9049054013a1b77]*/
+
+PyDoc_STRVAR(complex_from_number__doc__,
+"from_number($type, number, /)\n"
+"--\n"
+"\n"
+"Convert number to a complex floating-point number.");
+
+#define COMPLEX_FROM_NUMBER_METHODDEF    \
+    {"from_number", (PyCFunction)complex_from_number, METH_O|METH_CLASS, complex_from_number__doc__},
+/*[clinic end generated code: output=6a99688764c101d3 input=a9049054013a1b77]*/
