@@ -8,6 +8,7 @@
 #endif
 
 #include "Python.h"
+#include "pycore_abstract.h"      // _Py_is_valid_index()
 #include "pycore_bytesobject.h"   // _PyBytes_Repeat
 #include "pycore_call.h"          // _PyObject_CallMethod()
 #include "pycore_ceval.h"         // _PyEval_GetBuiltin()
@@ -835,7 +836,7 @@ array_length(arrayobject *a)
 static PyObject *
 array_item(arrayobject *a, Py_ssize_t i)
 {
-    if (i < 0 || i >= Py_SIZE(a)) {
+    if (!_Py_is_valid_index(i, Py_SIZE(a))) {
         PyErr_SetString(PyExc_IndexError, "array index out of range");
         return NULL;
     }
@@ -997,7 +998,7 @@ array_del_slice(arrayobject *a, Py_ssize_t ilow, Py_ssize_t ihigh)
 static int
 array_ass_item(arrayobject *a, Py_ssize_t i, PyObject *v)
 {
-    if (i < 0 || i >= Py_SIZE(a)) {
+    if (!_Py_is_valid_index(i, Py_SIZE(a))) {
         PyErr_SetString(PyExc_IndexError,
                          "array assignment index out of range");
         return -1;
@@ -1280,7 +1281,7 @@ array_array_pop_impl(arrayobject *self, Py_ssize_t i)
     }
     if (i < 0)
         i += Py_SIZE(self);
-    if (i < 0 || i >= Py_SIZE(self)) {
+    if (!_Py_is_valid_index(i, Py_SIZE(self))) {
         PyErr_SetString(PyExc_IndexError, "pop index out of range");
         return NULL;
     }
@@ -2470,7 +2471,7 @@ array_ass_subscr(arrayobject* self, PyObject* item, PyObject* value)
             return -1;
         if (i < 0)
             i += Py_SIZE(self);
-        if (i < 0 || i >= Py_SIZE(self)) {
+        if (!_Py_is_valid_index(i, Py_SIZE(self))) {
             PyErr_SetString(PyExc_IndexError,
                 "array assignment index out of range");
             return -1;

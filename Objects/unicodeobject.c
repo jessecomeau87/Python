@@ -1487,11 +1487,11 @@ PyUnicode_CopyCharacters(PyObject *to, Py_ssize_t to_start,
         return -1;
     }
 
-    if ((size_t)from_start > (size_t)PyUnicode_GET_LENGTH(from)) {
+    if (!_Py_is_valid_index(from_start, PyUnicode_GET_LENGTH(from))) {
         PyErr_SetString(PyExc_IndexError, "string index out of range");
         return -1;
     }
-    if ((size_t)to_start > (size_t)PyUnicode_GET_LENGTH(to)) {
+    if (!_Py_is_valid_index(to_start, PyUnicode_GET_LENGTH(to))) {
         PyErr_SetString(PyExc_IndexError, "string index out of range");
         return -1;
     }
@@ -3895,7 +3895,7 @@ PyUnicode_ReadChar(PyObject *unicode, Py_ssize_t index)
         PyErr_BadArgument();
         return (Py_UCS4)-1;
     }
-    if (index < 0 || index >= PyUnicode_GET_LENGTH(unicode)) {
+    if (!_Py_is_valid_index(index, PyUnicode_GET_LENGTH(unicode))) {
         PyErr_SetString(PyExc_IndexError, "string index out of range");
         return (Py_UCS4)-1;
     }

@@ -2,7 +2,8 @@
 
 #include "Python.h"
 #include "opcode.h"
-
+#include "structmember.h"         // PyMemberDef
+#include "pycore_abstract.h"      // _Py_is_valid_index()
 #include "pycore_code.h"          // _PyCodeConstructor
 #include "pycore_frame.h"         // FRAME_SPECIALS_SIZE
 #include "pycore_interp.h"        // PyInterpreterState.co_extra_freefuncs
@@ -1382,8 +1383,7 @@ PyUnstable_Code_SetExtra(PyObject *code, Py_ssize_t index, void *extra)
 {
     PyInterpreterState *interp = _PyInterpreterState_GET();
 
-    if (!PyCode_Check(code) || index < 0 ||
-            index >= interp->co_extra_user_count) {
+    if (!PyCode_Check(code) || !_Py_is_valid_index(index, interp->co_extra_user_count)) {
         PyErr_BadInternalCall();
         return -1;
     }
