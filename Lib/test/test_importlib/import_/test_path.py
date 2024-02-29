@@ -1,4 +1,6 @@
+from test.support import os_helper
 from test.test_importlib import util
+from test.test_importlib.metadata import fixtures
 
 importlib = util.import_importlib('importlib')
 machinery = util.import_importlib('importlib.machinery')
@@ -151,6 +153,25 @@ class FinderTests:
 
         with util.import_state(path=['']):
             # Do not want FileNotFoundError raised.
+            self.assertIsNone(self.machinery.PathFinder.find_spec('whatever'))
+
+    @os_helper.skip_unless_working_chmod
+    def test_permission_error_cwd(self):
+        # gh-115911
+        with (
+            fixtures.tempdir() as new_dir,
+            fixtures.save_mode(new_dir),
+            fixtures.save_cwd(),
+            util.import_state(path=['']),
+        ):
+            os.chdir(new_dir)
+            try:
+                os.chmod(new_dir, 0o000)
+            except OSError:
+                self.skipTest("platform does not allow "
+                              "changing mode of the cwd")
+
+            # Do not want PermissionError raised.
             self.assertIsNone(self.machinery.PathFinder.find_spec('whatever'))
 
     def test_invalidate_caches_finders(self):
