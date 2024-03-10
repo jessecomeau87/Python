@@ -435,6 +435,10 @@ def walk(top, topdown=True, onerror=None, followlinks=False):
 __all__.append("walk")
 
 if {open, stat} <= supports_dir_fd and {scandir, stat} <= supports_fd:
+    class _WalkAction:
+        YIELD = object()
+        CLOSE = object()
+        WALK = object()
 
     def fwalk(top=".", topdown=True, onerror=None, *, follow_symlinks=False, dir_fd=None):
         """Directory tree generator.
@@ -450,8 +454,8 @@ if {open, stat} <= supports_dir_fd and {scandir, stat} <= supports_fd:
         races (when follow_symlinks is False).
 
         If dir_fd is not None, it should be a file descriptor open to a directory,
-          and top should be relative; top will then be relative to that directory.
-          (dir_fd is always supported for fwalk.)
+        and top should be relative; top will then be relative to that directory.
+        (dir_fd is always supported for fwalk.)
 
         Caution:
         Since fwalk() yields file descriptors, those are only valid until the
@@ -469,76 +473,98 @@ if {open, stat} <= supports_dir_fd and {scandir, stat} <= supports_fd:
             if 'CVS' in dirs:
                 dirs.remove('CVS')  # don't visit CVS directories
         """
+        # Note: This uses O(depth of the directory tree) file descriptors: if
+        # necessary, it can be adapted to only require O(1) FDs, see issue
+        # bpo-13734 (gh-57943).
         sys.audit("os.fwalk", top, topdown, onerror, follow_symlinks, dir_fd)
         top = fspath(top)
+        isbytes = isinstance(top, bytes)
         # Note: To guard against symlink races, we use the standard
         # lstat()/open()/fstat() trick.
         if not follow_symlinks:
             orig_st = stat(top, follow_symlinks=False, dir_fd=dir_fd)
         topfd = open(top, O_RDONLY, dir_fd=dir_fd)
+        stack = [(_WalkAction.CLOSE, topfd)]
         try:
             if (follow_symlinks or (st.S_ISDIR(orig_st.st_mode) and
                                     path.samestat(orig_st, stat(topfd)))):
-                yield from _fwalk(topfd, top, isinstance(top, bytes),
-                                  topdown, onerror, follow_symlinks)
-        finally:
-            close(topfd)
+                stack.append((_WalkAction.WALK, (topfd, top)))
 
-    def _fwalk(topfd, toppath, isbytes, topdown, onerror, follow_symlinks):
-        # Note: This uses O(depth of the directory tree) file descriptors: if
-        # necessary, it can be adapted to only require O(1) FDs, see issue
-        # #13734.
-
-        scandir_it = scandir(topfd)
-        dirs = []
-        nondirs = []
-        entries = None if topdown or follow_symlinks else []
-        for entry in scandir_it:
-            name = entry.name
-            if isbytes:
-                name = fsencode(name)
-            try:
-                if entry.is_dir():
-                    dirs.append(name)
-                    if entries is not None:
-                        entries.append(entry)
+            while stack:
+                action, value = stack.pop()
+                if action is _WalkAction.YIELD:
+                    yield value
+                    continue
+                elif action is _WalkAction.CLOSE:
+                    close(value)
+                    continue
+                elif action is _WalkAction.WALK:
+                    topfd, top = value
                 else:
-                    nondirs.append(name)
-            except OSError:
-                try:
-                    # Add dangling symlinks, ignore disappeared files
-                    if entry.is_symlink():
-                        nondirs.append(name)
-                except OSError:
-                    pass
+                    raise AssertionError(f"invalid walk action: {action!r}")
 
-        if topdown:
-            yield toppath, dirs, nondirs, topfd
+                scandir_it = scandir(topfd)
+                dirs = []
+                nondirs = []
+                entries = None if topdown or follow_symlinks else []
+                for entry in scandir_it:
+                    name = entry.name
+                    if isbytes:
+                        name = fsencode(name)
+                    try:
+                        if entry.is_dir():
+                            dirs.append(name)
+                            if entries is not None:
+                                entries.append(entry)
+                        else:
+                            nondirs.append(name)
+                    except OSError:
+                        try:
+                            # Add dangling symlinks, ignore disappeared files
+                            if entry.is_symlink():
+                                nondirs.append(name)
+                        except OSError:
+                            pass
 
-        for name in dirs if entries is None else zip(dirs, entries):
-            try:
-                if not follow_symlinks:
-                    if topdown:
-                        orig_st = stat(name, dir_fd=topfd, follow_symlinks=False)
-                    else:
-                        assert entries is not None
-                        name, entry = name
-                        orig_st = entry.stat(follow_symlinks=False)
-                dirfd = open(name, O_RDONLY, dir_fd=topfd)
-            except OSError as err:
-                if onerror is not None:
-                    onerror(err)
-                continue
-            try:
-                if follow_symlinks or path.samestat(orig_st, stat(dirfd)):
-                    dirpath = path.join(toppath, name)
-                    yield from _fwalk(dirfd, dirpath, isbytes,
-                                      topdown, onerror, follow_symlinks)
-            finally:
-                close(dirfd)
+                if topdown:
+                    # Yield top immediately, before walking subdirs
+                    yield top, dirs, nondirs, topfd
+                else:
+                    # Yield top after walking subdirs
+                    stack.append(
+                        (_WalkAction.YIELD, (top, dirs, nondirs, topfd)))
 
-        if not topdown:
-            yield toppath, dirs, nondirs, topfd
+                for name in (reversed(dirs) if entries is None
+                             else zip(reversed(dirs), reversed(entries))):
+                    try:
+                        if not follow_symlinks:
+                            if topdown:
+                                orig_st = stat(name, dir_fd=topfd,
+                                               follow_symlinks=False)
+                            else:
+                                assert entries is not None
+                                name, entry = name
+                                orig_st = entry.stat(follow_symlinks=False)
+                        dirfd = open(name, O_RDONLY, dir_fd=topfd)
+                    except OSError as err:
+                        if onerror is not None:
+                            onerror(err)
+                        continue
+                    # Close dirfd right after all subdirs have been traversed.
+                    # Note that we use a stack, so actions appended first are
+                    # executed last.
+                    stack.append((_WalkAction.CLOSE, dirfd))
+                    # Walk all subdirs
+                    if follow_symlinks or path.samestat(orig_st, stat(dirfd)):
+                        dirpath = path.join(top, name)
+                        stack.append((_WalkAction.WALK, (dirfd, dirpath)))
+        finally:
+            for action, value in reversed(stack):
+                if action is _WalkAction.CLOSE:
+                    try:
+                        close(value)
+                    except OSError:
+                        pass
 
     __all__.append("fwalk")
 
