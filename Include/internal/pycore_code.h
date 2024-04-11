@@ -41,6 +41,7 @@ typedef struct {
 
 typedef struct {
     _Py_BackoffCounter counter;
+    uint16_t type_versions;
 } _PyBinaryOpCache;
 
 #define INLINE_CACHE_ENTRIES_BINARY_OP CACHE_ENTRIES(_PyBinaryOpCache)
@@ -292,6 +293,8 @@ extern void _Py_Specialize_ContainsOp(PyObject *value, _Py_CODEUNIT *instr);
 extern void _PyStaticCode_Fini(PyCodeObject *co);
 /* Function to intern strings of codeobjects and quicken the bytecode */
 extern int _PyStaticCode_Init(PyCodeObject *co);
+
+PyAPI_DATA(const binaryfunc) _Py_BinaryFunctionTable[];
 
 #ifdef Py_STATS
 

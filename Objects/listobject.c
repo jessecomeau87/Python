@@ -745,6 +745,16 @@ list_concat_lock_held(PyListObject *a, PyListObject *b)
     return (PyObject *)np;
 }
 
+PyObject *
+_PyList_Concat(PyListObject *a, PyListObject *b)
+{
+    PyObject *ret;
+    Py_BEGIN_CRITICAL_SECTION2(a, b);
+    ret = list_concat_lock_held(a, b);
+    Py_END_CRITICAL_SECTION2();
+    return ret;
+}
+
 static PyObject *
 list_concat(PyObject *aa, PyObject *bb)
 {
@@ -756,11 +766,7 @@ list_concat(PyObject *aa, PyObject *bb)
     }
     PyListObject *a = (PyListObject *)aa;
     PyListObject *b = (PyListObject *)bb;
-    PyObject *ret;
-    Py_BEGIN_CRITICAL_SECTION2(a, b);
-    ret = list_concat_lock_held(a, b);
-    Py_END_CRITICAL_SECTION2();
-    return ret;
+    return _PyList_Concat(a, b);
 }
 
 static PyObject *
@@ -3759,6 +3765,7 @@ PyTypeObject PyList_Type = {
     0,                                          /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
         Py_TPFLAGS_BASETYPE | Py_TPFLAGS_LIST_SUBCLASS |
+        Py_TPFLAGS_VALID_VERSION_TAG |
         _Py_TPFLAGS_MATCH_SELF | Py_TPFLAGS_SEQUENCE,  /* tp_flags */
     list___init____doc__,                       /* tp_doc */
     list_traverse,                              /* tp_traverse */
@@ -3780,6 +3787,7 @@ PyTypeObject PyList_Type = {
     PyType_GenericNew,                          /* tp_new */
     PyObject_GC_Del,                            /* tp_free */
     .tp_vectorcall = list_vectorcall,
+    .tp_version_tag = _Py_TYPE_VERSION_LIST,
 };
 
 /*********************** List Iterator **************************/
