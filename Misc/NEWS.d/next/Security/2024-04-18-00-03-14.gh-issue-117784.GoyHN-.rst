@@ -1,0 +1,1 @@
+Detect TLS post-handshake authentication (PHA) support in linked cryptography library. This change now allows CPython to build against cryptography/SSL libraries that don't fully support TLS PHA.
