@@ -716,6 +716,11 @@ class RunStringTests(TestBase):
         with self.assertRaises(TypeError):
             _interpreters.run_string(self.id, b'print("spam")')
 
+    def test_import_capsule(self):
+        interpreters.run_string(self.id, dedent("""
+            import zoneinfo
+            """))
+
     def test_with_shared(self):
         r, w = os.pipe()
 
