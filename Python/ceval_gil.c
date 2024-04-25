@@ -84,15 +84,15 @@ update_eval_breaker_for_thread(PyInterpreterState *interp, PyThreadState *tstate
     return;
 #endif
 
-    int32_t calls_to_do = _Py_atomic_load_int32_relaxed(
-        &interp->ceval.pending.calls_to_do);
-    if (calls_to_do) {
+    int32_t npending = _Py_atomic_load_int32_relaxed(
+        &interp->ceval.pending.npending);
+    if (npending) {
         _Py_set_eval_breaker_bit(tstate, _PY_CALLS_TO_DO_BIT);
     }
     else if (_Py_IsMainThread()) {
-        calls_to_do = _Py_atomic_load_int32_relaxed(
-            &_PyRuntime.ceval.pending_mainthread.calls_to_do);
-        if (calls_to_do) {
+        npending = _Py_atomic_load_int32_relaxed(
+            &_PyRuntime.ceval.pending_mainthread.npending);
+        if (npending) {
             _Py_set_eval_breaker_bit(tstate, _PY_CALLS_TO_DO_BIT);
         }
     }
@@ -624,6 +624,34 @@ PyEval_RestoreThread(PyThreadState *tstate)
 }
 
 
+void
+_PyEval_SignalReceived(void)
+{
+    _Py_set_eval_breaker_bit(_PyRuntime.main_tstate, _PY_SIGNALS_PENDING_BIT);
+}
+
+
+#ifndef Py_GIL_DISABLED
+static void
+signal_active_thread(PyInterpreterState *interp, uintptr_t bit)
+{
+    struct _gil_runtime_state *gil = interp->ceval.gil;
+
+    // If a thread from the targeted interpreter is holding the GIL, signal
+    // that thread. Otherwise, the next thread to run from the targeted
+    // interpreter will have its bit set as part of taking the GIL.
+    MUTEX_LOCK(gil->mutex);
+    if (_Py_atomic_load_int_relaxed(&gil->locked)) {
+        PyThreadState *holder = (PyThreadState*)_Py_atomic_load_ptr_relaxed(&gil->last_holder);
+        if (holder->interp == interp) {
+            _Py_set_eval_breaker_bit(holder, bit);
+        }
+    }
+    MUTEX_UNLOCK(gil->mutex);
+}
+#endif
+
+
 /* Mechanism whereby asynchronously executing callbacks (e.g. UNIX
    signal handlers or Mac I/O completion routines) can schedule calls
    to a function to be called synchronously.
@@ -646,29 +674,23 @@ PyEval_RestoreThread(PyThreadState *tstate)
    threadstate.
 */
 
-void
-_PyEval_SignalReceived(void)
-{
-    _Py_set_eval_breaker_bit(_PyRuntime.main_tstate, _PY_SIGNALS_PENDING_BIT);
-}
-
 /* Push one item onto the queue while holding the lock. */
 static int
 _push_pending_call(struct _pending_calls *pending,
                    _Py_pending_call_func func, void *arg, int flags)
 {
     int i = pending->last;
-    int j = (i + 1) % NPENDINGCALLS;
+    int j = (i + 1) % PENDINGCALLSARRAYSIZE;
     if (j == pending->first) {
-        return -1; /* Queue full */
+        return _Py_ADD_PENDING_FULL;
     }
     pending->calls[i].func = func;
     pending->calls[i].arg = arg;
     pending->calls[i].flags = flags;
     pending->last = j;
-    assert(pending->calls_to_do < NPENDINGCALLS);
-    _Py_atomic_add_int32(&pending->calls_to_do, 1);
-    return 0;
+    assert(pending->npending < PENDINGCALLSARRAYSIZE);
+    _Py_atomic_add_int32(&pending->npending, 1);
+    return _Py_ADD_PENDING_SUCCESS;
 }
 
 static int
@@ -695,38 +717,18 @@ _pop_pending_call(struct _pending_calls *pending,
     int i = _next_pending_call(pending, func, arg, flags);
     if (i >= 0) {
         pending->calls[i] = (struct _pending_call){0};
-        pending->first = (i + 1) % NPENDINGCALLS;
-        assert(pending->calls_to_do > 0);
-        _Py_atomic_add_int32(&pending->calls_to_do, -1);
+        pending->first = (i + 1) % PENDINGCALLSARRAYSIZE;
+        assert(pending->npending > 0);
+        _Py_atomic_add_int32(&pending->npending, -1);
     }
 }
-
-#ifndef Py_GIL_DISABLED
-static void
-signal_active_thread(PyInterpreterState *interp, uintptr_t bit)
-{
-    struct _gil_runtime_state *gil = interp->ceval.gil;
-
-    // If a thread from the targeted interpreter is holding the GIL, signal
-    // that thread. Otherwise, the next thread to run from the targeted
-    // interpreter will have its bit set as part of taking the GIL.
-    MUTEX_LOCK(gil->mutex);
-    if (_Py_atomic_load_int_relaxed(&gil->locked)) {
-        PyThreadState *holder = (PyThreadState*)_Py_atomic_load_ptr_relaxed(&gil->last_holder);
-        if (holder->interp == interp) {
-            _Py_set_eval_breaker_bit(holder, bit);
-        }
-    }
-    MUTEX_UNLOCK(gil->mutex);
-}
-#endif
 
 /* This implementation is thread-safe.  It allows
    scheduling to be made from any thread, and even from an executing
    callback.
  */
 
-int
+_Py_add_pending_call_result
 _PyEval_AddPendingCall(PyInterpreterState *interp,
                        _Py_pending_call_func func, void *arg, int flags)
 {
@@ -739,7 +741,8 @@ _PyEval_AddPendingCall(PyInterpreterState *interp,
     }
 
     PyMutex_Lock(&pending->mutex);
-    int result = _push_pending_call(pending, func, arg, flags);
+    _Py_add_pending_call_result result =
+        _push_pending_call(pending, func, arg, flags);
     PyMutex_Unlock(&pending->mutex);
 
     if (main_only) {
@@ -762,7 +765,15 @@ Py_AddPendingCall(_Py_pending_call_func func, void *arg)
     /* Legacy users of this API will continue to target the main thread
        (of the main interpreter). */
     PyInterpreterState *interp = _PyInterpreterState_Main();
-    return _PyEval_AddPendingCall(interp, func, arg, _Py_PENDING_MAINTHREADONLY);
+    _Py_add_pending_call_result r =
+        _PyEval_AddPendingCall(interp, func, arg, _Py_PENDING_MAINTHREADONLY);
+    if (r == _Py_ADD_PENDING_FULL) {
+        return -1;
+    }
+    else {
+        assert(r == _Py_ADD_PENDING_SUCCESS);
+        return 0;
+    }
 }
 
 static int
@@ -782,10 +793,20 @@ handle_signals(PyThreadState *tstate)
 }
 
 static int
-_make_pending_calls(struct _pending_calls *pending)
+_make_pending_calls(struct _pending_calls *pending, int32_t *p_npending)
 {
+    int res = 0;
+    int32_t npending;
+
+    assert(pending->max <= Py_ARRAY_LENGTH(pending->calls));
+    int32_t maxloop = pending->maxloop;
+    if (maxloop == 0) {
+        maxloop = pending->max;
+    }
+    assert(maxloop > 0 && maxloop <= pending->max);
+
     /* perform a bounded number of calls, in case of recursion */
-    for (int i=0; i<NPENDINGCALLS; i++) {
+    for (int i=0; i<maxloop; i++) {
         _Py_pending_call_func func = NULL;
         void *arg = NULL;
         int flags = 0;
@@ -793,21 +814,29 @@ _make_pending_calls(struct _pending_calls *pending)
         /* pop one item off the queue while holding the lock */
         PyMutex_Lock(&pending->mutex);
         _pop_pending_call(pending, &func, &arg, &flags);
+        npending = pending->npending;
         PyMutex_Unlock(&pending->mutex);
 
-        /* having released the lock, perform the callback */
+        /* Check if there are any more pending calls. */
         if (func == NULL) {
+            assert(npending == 0);
             break;
         }
-        int res = func(arg);
+
+        /* having released the lock, perform the callback */
+        res = func(arg);
         if ((flags & _Py_PENDING_RAWFREE) && arg != NULL) {
             PyMem_RawFree(arg);
         }
         if (res != 0) {
-            return -1;
+            res = -1;
+            goto finally;
         }
     }
-    return 0;
+
+finally:
+    *p_npending = npending;
+    return res;
 }
 
 static void
@@ -861,25 +890,35 @@ make_pending_calls(PyThreadState *tstate)
        added in-between re-signals */
     unsignal_pending_calls(tstate, interp);
 
-    if (_make_pending_calls(pending) != 0) {
+    int32_t npending;
+    if (_make_pending_calls(pending, &npending) != 0) {
         pending->busy = 0;
         /* There might not be more calls to make, but we play it safe. */
         signal_pending_calls(tstate, interp);
         return -1;
     }
+    if (npending > 0) {
+        /* We hit pending->maxloop. */
+        signal_pending_calls(tstate, interp);
+    }
 
     if (_Py_IsMainThread() && _Py_IsMainInterpreter(interp)) {
-        if (_make_pending_calls(pending_main) != 0) {
+        if (_make_pending_calls(pending_main, &npending) != 0) {
             pending->busy = 0;
             /* There might not be more calls to make, but we play it safe. */
             signal_pending_calls(tstate, interp);
             return -1;
+        }
+        if (npending > 0) {
+            /* We hit pending_main->maxloop. */
+            signal_pending_calls(tstate, interp);
         }
     }
 
     pending->busy = 0;
     return 0;
 }
+
 
 void
 _Py_set_eval_breaker_bit_all(PyInterpreterState *interp, uintptr_t bit)
@@ -911,12 +950,34 @@ _Py_FinishPendingCalls(PyThreadState *tstate)
     assert(PyGILState_Check());
     assert(_PyThreadState_CheckConsistency(tstate));
 
-    if (make_pending_calls(tstate) < 0) {
-        PyObject *exc = _PyErr_GetRaisedException(tstate);
-        PyErr_BadInternalCall();
-        _PyErr_ChainExceptions1(exc);
-        _PyErr_Print(tstate);
-    }
+    struct _pending_calls *pending = &tstate->interp->ceval.pending;
+    struct _pending_calls *pending_main =
+            _Py_IsMainThread() && _Py_IsMainInterpreter(tstate->interp)
+            ? &_PyRuntime.ceval.pending_mainthread
+            : NULL;
+    /* make_pending_calls() may return early without making all pending
+       calls, so we keep trying until we're actually done. */
+    int32_t npending;
+#ifndef NDEBUG
+    int32_t npending_prev = INT32_MAX;
+#endif
+    do {
+        if (make_pending_calls(tstate) < 0) {
+            PyObject *exc = _PyErr_GetRaisedException(tstate);
+            PyErr_BadInternalCall();
+            _PyErr_ChainExceptions1(exc);
+            _PyErr_Print(tstate);
+        }
+
+        npending = _Py_atomic_load_int32_relaxed(&pending->npending);
+        if (pending_main != NULL) {
+            npending += _Py_atomic_load_int32_relaxed(&pending_main->npending);
+        }
+#ifndef NDEBUG
+        assert(npending_prev > npending);
+        npending_prev = npending;
+#endif
+    } while (npending > 0);
 }
 
 int
