@@ -114,6 +114,12 @@ email
 * The *isdst* parameter has been removed from :func:`email.utils.localtime`.
   (Contributed by Hugo van Kemenade in :gh:`118798`.)
 
+pty
+___
+
+* Remove deprecated ``pty.master_open`` and ``pty.slave_open``.
+  They had previously raised a :exc:`DeprecationWarning` since Python 3.12.
+
 Others
 ------
 
