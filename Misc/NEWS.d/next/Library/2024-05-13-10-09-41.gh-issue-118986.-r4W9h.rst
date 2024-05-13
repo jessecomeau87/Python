@@ -1,0 +1,2 @@
+The socket options IPV6_RECVERR and IP_RECVERR are now exposed through the
+socket module.
