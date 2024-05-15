@@ -4179,6 +4179,7 @@ class QueueHandlerTest(BaseTest):
 
 if hasattr(logging.handlers, 'QueueListener'):
     import multiprocessing
+    import multiprocessing.util
     from unittest.mock import patch
 
     @threading_helper.requires_working_threading()
@@ -4189,6 +4190,10 @@ if hasattr(logging.handlers, 'QueueListener'):
         """
 
         repeat = 20
+
+        def tearDown(self):
+            multiprocessing.util._cleanup_tests()
+            super().tearDown()
 
         @staticmethod
         def setup_and_log(log_queue, ident):
@@ -5097,6 +5102,8 @@ class LogRecordTest(BaseTest):
             # In other processes, processName is correct when multiprocessing in imported,
             # but it is (incorrectly) defaulted to 'MainProcess' otherwise (bpo-38762).
             import multiprocessing
+            import multiprocessing.util
+            self.addCleanup(multiprocessing.util._cleanup_tests)
             parent_conn, child_conn = multiprocessing.Pipe()
             p = multiprocessing.Process(
                 target=self._extract_logrecord_process_name,
