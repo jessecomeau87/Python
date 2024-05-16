@@ -1785,39 +1785,6 @@ exit:
 
 #if defined(MS_WINDOWS)
 
-PyDoc_STRVAR(os__getfullpathname__doc__,
-"_getfullpathname($module, path, /)\n"
-"--\n"
-"\n");
-
-#define OS__GETFULLPATHNAME_METHODDEF    \
-    {"_getfullpathname", (PyCFunction)os__getfullpathname, METH_O, os__getfullpathname__doc__},
-
-static PyObject *
-os__getfullpathname_impl(PyObject *module, path_t *path);
-
-static PyObject *
-os__getfullpathname(PyObject *module, PyObject *arg)
-{
-    PyObject *return_value = NULL;
-    path_t path = PATH_T_INITIALIZE("_getfullpathname", "path", 0, 0);
-
-    if (!path_converter(arg, &path)) {
-        goto exit;
-    }
-    return_value = os__getfullpathname_impl(module, &path);
-
-exit:
-    /* Cleanup for path */
-    path_cleanup(&path);
-
-    return return_value;
-}
-
-#endif /* defined(MS_WINDOWS) */
-
-#if defined(MS_WINDOWS)
-
 PyDoc_STRVAR(os__getfinalpathname__doc__,
 "_getfinalpathname($module, path, /)\n"
 "--\n"
@@ -2356,6 +2323,35 @@ os__path_normpath(PyObject *module, PyObject *const *args, Py_ssize_t nargs, PyO
     }
     path = args[0];
     return_value = os__path_normpath_impl(module, path);
+
+exit:
+    return return_value;
+}
+
+PyDoc_STRVAR(os__path_abspath__doc__,
+"_path_abspath($module, path, /)\n"
+"--\n"
+"\n"
+"Make path absolute.");
+
+#define OS__PATH_ABSPATH_METHODDEF    \
+    {"_path_abspath", (PyCFunction)os__path_abspath, METH_O, os__path_abspath__doc__},
+
+static PyObject *
+os__path_abspath_impl(PyObject *module, PyObject *path);
+
+static PyObject *
+os__path_abspath(PyObject *module, PyObject *arg)
+{
+    PyObject *return_value = NULL;
+    PyObject *path;
+
+    if (!PyUnicode_Check(arg)) {
+        _PyArg_BadArgument("_path_abspath", "argument", "str", arg);
+        goto exit;
+    }
+    path = arg;
+    return_value = os__path_abspath_impl(module, path);
 
 exit:
     return return_value;
@@ -12077,10 +12073,6 @@ os__supports_virtual_terminal(PyObject *module, PyObject *Py_UNUSED(ignored))
     #define OS__PATH_ISDEVDRIVE_METHODDEF
 #endif /* !defined(OS__PATH_ISDEVDRIVE_METHODDEF) */
 
-#ifndef OS__GETFULLPATHNAME_METHODDEF
-    #define OS__GETFULLPATHNAME_METHODDEF
-#endif /* !defined(OS__GETFULLPATHNAME_METHODDEF) */
-
 #ifndef OS__GETFINALPATHNAME_METHODDEF
     #define OS__GETFINALPATHNAME_METHODDEF
 #endif /* !defined(OS__GETFINALPATHNAME_METHODDEF) */
@@ -12660,4 +12652,4 @@ os__supports_virtual_terminal(PyObject *module, PyObject *Py_UNUSED(ignored))
 #ifndef OS__SUPPORTS_VIRTUAL_TERMINAL_METHODDEF
     #define OS__SUPPORTS_VIRTUAL_TERMINAL_METHODDEF
 #endif /* !defined(OS__SUPPORTS_VIRTUAL_TERMINAL_METHODDEF) */
-/*[clinic end generated code: output=c4698b47007cd6eb input=a9049054013a1b77]*/
+/*[clinic end generated code: output=a5c86cf571db8e59 input=a9049054013a1b77]*/
