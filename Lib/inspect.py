@@ -3045,10 +3045,12 @@ class Signature:
 
     @classmethod
     def from_callable(cls, obj, *,
-                      follow_wrapped=True, globals=None, locals=None, eval_str=False):
+                      follow_wrapped=True, bound_arg=False,
+                      globals=None, locals=None, eval_str=False):
         """Constructs Signature for the given callable object."""
         return _signature_from_callable(obj, sigcls=cls,
                                         follow_wrapper_chains=follow_wrapped,
+                                        skip_bound_arg=not bound_arg,
                                         globals=globals, locals=locals, eval_str=eval_str)
 
     @property
@@ -3319,9 +3321,11 @@ class Signature:
         return rendered
 
 
-def signature(obj, *, follow_wrapped=True, globals=None, locals=None, eval_str=False):
+def signature(obj, *, follow_wrapped=True, bound_arg=False,
+              globals=None, locals=None, eval_str=False):
     """Get a signature object for the passed callable."""
     return Signature.from_callable(obj, follow_wrapped=follow_wrapped,
+                                   bound_arg=bound_arg,
                                    globals=globals, locals=locals, eval_str=eval_str)
 
 
