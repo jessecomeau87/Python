@@ -3635,6 +3635,7 @@ type_new_alloc(type_new_ctx *ctx)
     et->ht_name = Py_NewRef(ctx->name);
     et->ht_module = NULL;
     et->_ht_tpname = NULL;
+    et->ht_static_spec = NULL;
 
     _PyObject_SetDeferredRefcount((PyObject *)et);
 
@@ -4661,6 +4662,17 @@ _PyType_FromMetaclass_impl(
                 }
             }
             break;
+        case Py_id_static_spec:
+            {
+                if (slot->pfunc && slot->pfunc != spec) {
+                    PyErr_Format(PyExc_TypeError,
+                                 "Py_id_static_spec slot does not match "
+                                 "the type spec of '%s'", type->tp_name);
+                    goto finally;
+                }
+                res->ht_static_spec = (PyType_Spec *)slot->pfunc;
+            }
+            break;
         default:
             {
                 /* Copy other slots directly */
@@ -4823,6 +4835,9 @@ PyType_GetSlot(PyTypeObject *type, int slot)
         PyErr_BadInternalCall();
         return NULL;
     }
+    if (slot == Py_id_static_spec) {
+        return NULL;
+    }
 
     parent_slot = *(void**)((char*)type + pyslot_offsets[slot].slot_offset);
     if (parent_slot == NULL) {
@@ -4951,6 +4966,63 @@ _PyType_GetModuleByDef2(PyTypeObject *left, PyTypeObject *right,
         }
     }
     return module;
+}
+
+static PyTypeObject *
+get_base_by_spec_recursive(PyTypeObject *type, PyType_Spec *spec)
+{
+    PyObject *bases = type->tp_bases;
+    Py_ssize_t n = PyTuple_GET_SIZE(bases);
+    for (Py_ssize_t i = 0; i < n; i++) {
+        PyTypeObject *base = (PyTypeObject *)PyTuple_GET_ITEM(bases, i);
+        if (!_PyType_HasFeature(base, Py_TPFLAGS_HEAPTYPE)) {
+            continue;
+        }
+        if (((PyHeapTypeObject*)base)->ht_static_spec == spec) {
+            return base;
+        }
+        base = get_base_by_spec_recursive(base, spec);
+        if (base) {
+            return base;
+        }
+    }
+    return NULL;
+}
+
+PyTypeObject *
+_PyType_GetBaseBySpec(PyTypeObject *type, PyType_Spec *spec)
+{
+    assert(spec);
+    assert(PyType_Check(type));
+    PyTypeObject *res = NULL;
+
+    BEGIN_TYPE_LOCK()
+    PyObject *mro = lookup_tp_mro(type);
+    if (mro == NULL) {
+        res = get_base_by_spec_recursive(type, spec);
+    }
+    else {
+        assert(PyTuple_Check(mro));
+        for (Py_ssize_t i = PyTuple_GET_SIZE(mro) - 1; i >= 0; i--) {
+            PyObject *super = PyTuple_GET_ITEM(mro, i);
+            if(!_PyType_HasFeature((PyTypeObject *)super, Py_TPFLAGS_HEAPTYPE)) {
+                continue;
+            }
+            if (((PyHeapTypeObject*)super)->ht_static_spec == spec) {
+                res = _PyType_CAST(super);
+                break;
+            }
+        }
+    }
+    END_TYPE_LOCK()
+
+    if (res == NULL) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "PyType_GetBaseBySpec: No superclass of '%s' has the given spec",
+            type->tp_name);
+    }
+    return res;
 }
 
 void *
@@ -5633,6 +5705,7 @@ type_dealloc(PyObject *self)
     }
     Py_XDECREF(et->ht_module);
     PyMem_Free(et->_ht_tpname);
+    et->ht_static_spec = NULL;
     Py_TYPE(type)->tp_free((PyObject *)type);
 }
 
