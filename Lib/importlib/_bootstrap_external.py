@@ -1503,7 +1503,7 @@ class PathFinder:
         if path == '':
             try:
                 path = _os.getcwd()
-            except FileNotFoundError:
+            except (FileNotFoundError, PermissionError):
                 # Don't cache the failure as the cwd can easily change to
                 # a valid directory later on.
                 return None
