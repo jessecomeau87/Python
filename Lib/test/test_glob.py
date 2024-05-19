@@ -318,7 +318,11 @@ class GlobTests(unittest.TestCase):
         with change_cwd(self.tempdir):
             join = os.path.join
             eq(glob.glob('**', recursive=True), [join(*i) for i in full])
+            eq(glob.glob(join('**', '**'), recursive=True),
+                [join(*i) for i in full])
             eq(glob.glob(join('**', ''), recursive=True),
+                [join(*i) for i in dirs])
+            eq(glob.glob(join('**', '**', ''), recursive=True),
                 [join(*i) for i in dirs])
             eq(glob.glob(join('**', '*'), recursive=True),
                 [join(*i) for i in full])
