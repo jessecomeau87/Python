@@ -2938,7 +2938,7 @@ PyUnicode_FromFormat(const char *format, ...)
 }
 
 int
-PyUnicodeWriter_Format(PyUnicodeWriter *writer, const char *format, ...)
+PyUnicodeWriter_FromFormat(PyUnicodeWriter *writer, const char *format, ...)
 {
     _PyUnicodeWriter *_writer = (_PyUnicodeWriter*)writer;
 

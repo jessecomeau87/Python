@@ -249,13 +249,18 @@ test_unicodewriter(PyObject *self, PyObject *Py_UNUSED(args))
     }
 
     // test PyUnicodeWriter_WriteSubstring()
-    str = PyUnicode_FromString("[value]");
+    str = PyUnicode_FromString("[long]");
     if (str == NULL) {
         goto error;
     }
-    ret = PyUnicodeWriter_WriteSubstring(writer, str, 1, 6);
+    ret = PyUnicodeWriter_WriteSubstring(writer, str, 1, 5);
     Py_CLEAR(str);
     if (ret < 0) {
+        goto error;
+    }
+
+    // test PyUnicodeWriter_WriteASCIIString()
+    if (PyUnicodeWriter_WriteASCIIString(writer, " value", 6) < 0) {
         goto error;
     }
 
@@ -263,7 +268,7 @@ test_unicodewriter(PyObject *self, PyObject *Py_UNUSED(args))
     if (result == NULL) {
         return NULL;
     }
-    assert(PyUnicode_EqualToUTF8(result, "var=value"));
+    assert(PyUnicode_EqualToUTF8(result, "var=long value"));
     Py_DECREF(result);
 
     Py_RETURN_NONE;
@@ -282,8 +287,8 @@ test_unicodewriter_format(PyObject *self, PyObject *Py_UNUSED(args))
         return NULL;
     }
 
-    // test PyUnicodeWriter_Format()
-    if (PyUnicodeWriter_Format(writer, "%s %i", "Hello", 123) < 0) {
+    // test PyUnicodeWriter_FromFormat()
+    if (PyUnicodeWriter_FromFormat(writer, "%s %i", "Hello", 123) < 0) {
         goto error;
     }
 
