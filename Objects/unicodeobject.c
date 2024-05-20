@@ -2858,23 +2858,21 @@ unicode_fromformat_arg(_PyUnicodeWriter *writer,
     return f;
 }
 
-PyObject *
-PyUnicode_FromFormatV(const char *format, va_list vargs)
+static int
+unicode_from_format(_PyUnicodeWriter *writer, const char *format, va_list vargs)
 {
+    writer->min_length += strlen(format) + 100;
+    writer->overallocate = 1;
+
     va_list vargs2;
     const char *f;
-    _PyUnicodeWriter writer;
-
-    _PyUnicodeWriter_Init(&writer);
-    writer.min_length = strlen(format) + 100;
-    writer.overallocate = 1;
 
     // Copy varags to be able to pass a reference to a subfunction.
     va_copy(vargs2, vargs);
 
     for (f = format; *f; ) {
         if (*f == '%') {
-            f = unicode_fromformat_arg(&writer, f, &vargs2);
+            f = unicode_fromformat_arg(writer, f, &vargs2);
             if (f == NULL)
                 goto fail;
         }
@@ -2898,21 +2896,33 @@ PyUnicode_FromFormatV(const char *format, va_list vargs)
             len = p - f;
 
             if (*p == '\0')
-                writer.overallocate = 0;
+                writer->overallocate = 0;
 
-            if (_PyUnicodeWriter_WriteASCIIString(&writer, f, len) < 0)
+            if (_PyUnicodeWriter_WriteASCIIString(writer, f, len) < 0)
                 goto fail;
 
             f = p;
         }
     }
     va_end(vargs2);
-    return _PyUnicodeWriter_Finish(&writer);
+    return 0;
 
   fail:
     va_end(vargs2);
-    _PyUnicodeWriter_Dealloc(&writer);
-    return NULL;
+    return -1;
+}
+
+PyObject *
+PyUnicode_FromFormatV(const char *format, va_list vargs)
+{
+    _PyUnicodeWriter writer;
+    _PyUnicodeWriter_Init(&writer);
+
+    if (unicode_from_format(&writer, format, vargs) < 0) {
+        _PyUnicodeWriter_Dealloc(&writer);
+        return NULL;
+    }
+    return _PyUnicodeWriter_Finish(&writer);
 }
 
 PyObject *
@@ -2923,6 +2933,18 @@ PyUnicode_FromFormat(const char *format, ...)
 
     va_start(vargs, format);
     ret = PyUnicode_FromFormatV(format, vargs);
+    va_end(vargs);
+    return ret;
+}
+
+int
+PyUnicodeWriter_FromFormat(PyUnicodeWriter *writer, const char *format, ...)
+{
+    _PyUnicodeWriter *_writer = (_PyUnicodeWriter*)writer;
+
+    va_list vargs;
+    va_start(vargs, format);
+    int ret = unicode_from_format(_writer, format, vargs);
     va_end(vargs);
     return ret;
 }
@@ -13065,6 +13087,7 @@ unicode_endswith_impl(PyObject *self, PyObject *subobj, Py_ssize_t start,
     return PyBool_FromLong(result);
 }
 
+
 static inline void
 _PyUnicodeWriter_Update(_PyUnicodeWriter *writer)
 {
@@ -13088,6 +13111,7 @@ _PyUnicodeWriter_Update(_PyUnicodeWriter *writer)
     }
 }
 
+
 void
 _PyUnicodeWriter_Init(_PyUnicodeWriter *writer)
 {
@@ -13096,11 +13120,34 @@ _PyUnicodeWriter_Init(_PyUnicodeWriter *writer)
     /* ASCII is the bare minimum */
     writer->min_char = 127;
 
-    /* use a value smaller than PyUnicode_1BYTE_KIND() so
+    /* use a kind value smaller than PyUnicode_1BYTE_KIND so
        _PyUnicodeWriter_PrepareKind() will copy the buffer. */
-    writer->kind = 0;
+    assert(writer->kind == 0);
     assert(writer->kind <= PyUnicode_1BYTE_KIND);
 }
+
+
+PyUnicodeWriter*
+PyUnicodeWriter_Create(void)
+{
+    const size_t size = sizeof(_PyUnicodeWriter);
+    PyUnicodeWriter *writer = PyMem_Malloc(size);
+    if (writer == NULL) {
+        PyErr_NoMemory();
+        return NULL;
+    }
+    _PyUnicodeWriter_Init((_PyUnicodeWriter*)writer);
+    PyUnicodeWriter_SetOverallocate(writer, 1);
+    return writer;
+}
+
+
+void PyUnicodeWriter_Free(PyUnicodeWriter *writer)
+{
+    _PyUnicodeWriter_Dealloc((_PyUnicodeWriter*)writer);
+    PyMem_Free(writer);
+}
+
 
 // Initialize _PyUnicodeWriter with initial buffer
 static inline void
@@ -13111,6 +13158,14 @@ _PyUnicodeWriter_InitWithBuffer(_PyUnicodeWriter *writer, PyObject *buffer)
     _PyUnicodeWriter_Update(writer);
     writer->min_length = writer->size;
 }
+
+
+void
+PyUnicodeWriter_SetOverallocate(PyUnicodeWriter *writer, int overallocate)
+{
+    ((_PyUnicodeWriter*)writer)->overallocate = overallocate;
+}
+
 
 int
 _PyUnicodeWriter_PrepareInternal(_PyUnicodeWriter *writer,
@@ -13227,9 +13282,16 @@ _PyUnicodeWriter_WriteChar(_PyUnicodeWriter *writer, Py_UCS4 ch)
     return _PyUnicodeWriter_WriteCharInline(writer, ch);
 }
 
+int PyUnicodeWriter_WriteChar(PyUnicodeWriter *writer, Py_UCS4 ch)
+{
+    return _PyUnicodeWriter_WriteChar((_PyUnicodeWriter*)writer, ch);
+}
+
 int
 _PyUnicodeWriter_WriteStr(_PyUnicodeWriter *writer, PyObject *str)
 {
+    assert(PyUnicode_Check(str));
+
     Py_UCS4 maxchar;
     Py_ssize_t len;
 
@@ -13254,6 +13316,17 @@ _PyUnicodeWriter_WriteStr(_PyUnicodeWriter *writer, PyObject *str)
     writer->pos += len;
     return 0;
 }
+
+int
+PyUnicodeWriter_WriteStr(PyUnicodeWriter *writer, PyObject *str)
+{
+    if (!PyUnicode_Check(str)) {
+        PyErr_Format(PyExc_TypeError, "expect str, not %T", str);
+        return -1;
+    }
+    return _PyUnicodeWriter_WriteStr((_PyUnicodeWriter*)writer, str);
+}
+
 
 int
 _PyUnicodeWriter_WriteSubstring(_PyUnicodeWriter *writer, PyObject *str,
@@ -13286,6 +13359,29 @@ _PyUnicodeWriter_WriteSubstring(_PyUnicodeWriter *writer, PyObject *str,
     writer->pos += len;
     return 0;
 }
+
+
+int
+PyUnicodeWriter_WriteSubstring(PyUnicodeWriter *writer, PyObject *str,
+                               Py_ssize_t start, Py_ssize_t end)
+{
+    if (!PyUnicode_Check(str)) {
+        PyErr_Format(PyExc_TypeError, "expect str, not %T", str);
+        return -1;
+    }
+    if (start < 0 || start > end) {
+        PyErr_Format(PyExc_ValueError, "invalid start argument");
+        return -1;
+    }
+    if (end > PyUnicode_GET_LENGTH(str)) {
+        PyErr_Format(PyExc_ValueError, "invalid end argument");
+        return -1;
+    }
+
+    return _PyUnicodeWriter_WriteSubstring((_PyUnicodeWriter*)writer, str,
+                                           start, end);
+}
+
 
 int
 _PyUnicodeWriter_WriteASCIIString(_PyUnicodeWriter *writer,
@@ -13348,6 +13444,15 @@ _PyUnicodeWriter_WriteASCIIString(_PyUnicodeWriter *writer,
 }
 
 int
+PyUnicodeWriter_WriteASCIIString(PyUnicodeWriter *writer,
+                                 const char *ascii,
+                                 Py_ssize_t len)
+{
+    return _PyUnicodeWriter_WriteASCIIString((_PyUnicodeWriter*)writer,
+                                             ascii, len);
+}
+
+int
 _PyUnicodeWriter_WriteLatin1String(_PyUnicodeWriter *writer,
                                    const char *str, Py_ssize_t len)
 {
@@ -13392,6 +13497,17 @@ _PyUnicodeWriter_Finish(_PyUnicodeWriter *writer)
     assert(_PyUnicode_CheckConsistency(str, 1));
     return unicode_result(str);
 }
+
+
+PyObject*
+PyUnicodeWriter_Finish(PyUnicodeWriter *writer)
+{
+    PyObject *str = _PyUnicodeWriter_Finish((_PyUnicodeWriter*)writer);
+    assert(((_PyUnicodeWriter*)writer)->buffer == NULL);
+    PyMem_Free(writer);
+    return str;
+}
+
 
 void
 _PyUnicodeWriter_Dealloc(_PyUnicodeWriter *writer)
