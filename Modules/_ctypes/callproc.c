@@ -1191,6 +1191,11 @@ PyObject *_ctypes_callproc(ctypes_state *st,
     void **avalues;
     PyObject *retval = NULL;
 
+    if (PySys_Audit("ctypes.call_function", "nO",
+                    (Py_ssize_t)pProc, argtuple) < 0) {
+        return NULL;
+    }
+
     n = argcount = PyTuple_GET_SIZE(argtuple);
 #ifdef MS_WIN32
     /* an optional COM object this pointer */
@@ -1641,10 +1646,6 @@ call_function(PyObject *self, PyObject *args)
                           &_parse_voidp, &func,
                           &PyTuple_Type, &arguments))
         return NULL;
-    if (PySys_Audit("ctypes.call_function", "nO",
-                    (Py_ssize_t)func, arguments) < 0) {
-        return NULL;
-    }
 
     ctypes_state *st = get_module_state(self);
     result = _ctypes_callproc(st,
