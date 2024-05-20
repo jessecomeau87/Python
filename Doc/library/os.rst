@@ -2630,6 +2630,7 @@ features:
       than the optional "print name" field that was previously returned.
 
 .. function:: remove(path, *, dir_fd=None)
+              unlink(path, *, dir_fd=None)
 
    Remove (delete) the file *path*.  If *path* is a directory, an
    :exc:`OSError` is raised.  Use :func:`rmdir` to remove directories.
@@ -2641,8 +2642,6 @@ features:
    On Windows, attempting to remove a file that is in use causes an exception to
    be raised; on Unix, the directory entry is removed but the storage allocated
    to the file is not made available until the original file is no longer in use.
-
-   This function is semantically identical to :func:`unlink`.
 
    .. audit-event:: os.remove path,dir_fd os.remove
 
@@ -3496,22 +3495,6 @@ features:
 
    .. versionchanged:: 3.5
       Added support for Windows
-
-   .. versionchanged:: 3.6
-      Accepts a :term:`path-like object`.
-
-
-.. function:: unlink(path, *, dir_fd=None)
-
-   Remove (delete) the file *path*.  This function is semantically
-   identical to :func:`remove`; the ``unlink`` name is its
-   traditional Unix name.  Please see the documentation for
-   :func:`remove` for further information.
-
-   .. audit-event:: os.remove path,dir_fd os.unlink
-
-   .. versionchanged:: 3.3
-      Added the *dir_fd* parameter.
 
    .. versionchanged:: 3.6
       Accepts a :term:`path-like object`.
