@@ -188,11 +188,11 @@
       "checksums": [
         {
           "algorithm": "SHA1",
-          "checksumValue": "fed1311be8577491b7f63085a27014eabf2caec8"
+          "checksumValue": "be21968aa6e358cb2f193f96d05df806fdf1575c"
         },
         {
           "algorithm": "SHA256",
-          "checksumValue": "3dc233eca5fa1bb7387c503f8a12d840707e4374b229e05d5657db9645725040"
+          "checksumValue": "debff6d64b3ef4915873857c315a43193e3fa3e51be11ea19bcbc9d0451985dd"
         }
       ],
       "fileName": "Modules/expat/xmlparse.c"

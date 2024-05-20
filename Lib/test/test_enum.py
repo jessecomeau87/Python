@@ -447,7 +447,7 @@ class _EnumTests:
     def test_bad_new_super(self):
         with self.assertRaisesRegex(
                 TypeError,
-                'do not use .super...__new__;',
+                'do not use .super...__new__.;',
             ):
             class BadSuper(self.enum_type):
                 def __new__(cls, value):

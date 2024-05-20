@@ -28,7 +28,7 @@ ALLSPHINXOPTS = -b $(BUILDER) \
 
 .PHONY: help
 help:
-	@echo "Please use \`make <target>' where <target> is one of"
+	@echo "Please use 'make <target>' where <target> is one of"
 	@echo "  clean      to remove build files"
 	@echo "  venv       to create a venv with necessary tools"
 	@echo "  html       to make standalone HTML files"
@@ -90,7 +90,7 @@ htmlhelp: build
 latex: BUILDER = latex
 latex: build
 	@echo "Build finished; the LaTeX files are in build/latex."
-	@echo "Run \`make all-pdf' or \`make all-ps' in that directory to" \
+	@echo "Run 'make all-pdf' or 'make all-ps' in that directory to" \
 	      "run these through (pdf)latex."
 
 .PHONY: text
@@ -102,7 +102,7 @@ text: build
 texinfo: BUILDER = texinfo
 texinfo: build
 	@echo "Build finished; the python.texi file is in build/texinfo."
-	@echo "Run \`make info' in that directory to run it through makeinfo."
+	@echo "Run 'make info' in that directory to run it through makeinfo."
 
 .PHONY: epub
 epub: BUILDER = epub
@@ -167,7 +167,7 @@ clean-venv:
 venv:
 	@if [ -d $(VENVDIR) ] ; then \
 		echo "venv already exists."; \
-		echo "To recreate it, remove it first with \`make clean-venv'."; \
+		echo "To recreate it, remove it first with 'make clean-venv'."; \
 	else \
 		echo "Creating venv in $(VENVDIR)"; \
 		$(PYTHON) -m venv $(VENVDIR); \

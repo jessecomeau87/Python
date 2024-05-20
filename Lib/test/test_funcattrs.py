@@ -59,7 +59,7 @@ class FunctionPropertiesTest(FuncAttrsTest):
                      "implementations, should show up in next dir")
 
     def test_duplicate_function_equality(self):
-        # Body of `duplicate' is the exact same as self.b
+        # Body of 'duplicate' is the exact same as self.b
         def duplicate():
             'my docstring'
             return 3

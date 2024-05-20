@@ -152,7 +152,7 @@ _PyEval_IsGILEnabled(PyThreadState *tstate)
 // Enable or disable the GIL used by the interpreter that owns tstate, which
 // must be the current thread. This may affect other interpreters, if the GIL
 // is shared. All three functions will be no-ops (and return 0) if the
-// interpreter's `enable_gil' config is not _PyConfig_GIL_DEFAULT.
+// interpreter's 'enable_gil' config is not _PyConfig_GIL_DEFAULT.
 //
 // Every call to _PyEval_EnableGILTransient() must be paired with exactly one
 // call to either _PyEval_EnableGILPermanent() or

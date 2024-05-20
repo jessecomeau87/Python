@@ -17,7 +17,7 @@ automatically applied by IDLE when the extension is linked to an edit
 window.
 
 An IDLE extension class is instantiated with a single argument,
-`editwin', an EditorWindow instance. The extension cannot assume much
+'editwin', an EditorWindow instance. The extension cannot assume much
 about this argument, but it is guaranteed to have the following instance
 variables:
 

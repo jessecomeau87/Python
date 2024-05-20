@@ -19371,7 +19371,7 @@ Library
 - Bug #1245379: Add "unicode-1-1-utf-7" as an alias for "utf-7" to
   ``encodings.aliases``.
 
-- ` uu.encode()`` and ``uu.decode()`` now support unicode filenames.
+- ``uu.encode()`` and ``uu.decode()`` now support unicode filenames.
 
 - Patch #1413711: Certain patterns of differences were making difflib
   touch the recursion limit.
@@ -25338,7 +25338,7 @@ Standard library
 - mailbox.py now has a new class, PortableUnixMailbox which is
   identical to UnixMailbox but uses a more portable scheme for
   determining From_ separators.  Also, the constructors for all the
-  classes in this module have a new optional `factory' argument, which
+  classes in this module have a new optional 'factory' argument, which
   is a callable used when new message classes must be instantiated by
   the next() method.
 
@@ -25969,7 +25969,7 @@ Standard library and extensions
 - cStringIO: Implemented readlines() method.
 
 - dbm: Add get() and setdefault() methods to dbm object.  Add constant
-  `library' to module that names the library used.  Added doc strings
+  'library' to module that names the library used.  Added doc strings
   and method names to error messages.  Uses configure to determine
   which ndbm.h file to include; Berkeley DB's nbdm and GDBM's ndbm is
   now available options.

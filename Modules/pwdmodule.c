@@ -49,7 +49,7 @@ PyDoc_STRVAR(pwd__doc__,
 It is available on all Unix versions.\n\
 \n\
 Password database entries are reported as 7-tuples containing the following\n\
-items from the password database (see `<pwd.h>'), in order:\n\
+items from the password database (see '<pwd.h>'), in order:\n\
 pw_name, pw_passwd, pw_uid, pw_gid, pw_gecos, pw_dir, pw_shell.\n\
 The uid and gid items are integers, all others are strings. An\n\
 exception is raised if the entry asked for cannot be found.");

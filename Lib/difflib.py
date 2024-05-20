@@ -444,7 +444,7 @@ class SequenceMatcher:
         # This is most naturally expressed as a recursive algorithm, but
         # at least one user bumped into extreme use cases that exceeded
         # the recursion limit on their box.  So, now we maintain a list
-        # ('queue`) of blocks we still need to look at, and append partial
+        # ('queue') of blocks we still need to look at, and append partial
         # results to `matching_blocks` in a loop; the matches are sorted
         # at the end.
         queue = [(0, la, 0, lb)]

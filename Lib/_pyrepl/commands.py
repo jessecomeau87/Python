@@ -437,13 +437,13 @@ class invalid_key(Command):
     def do(self) -> None:
         pending = self.reader.console.getpending()
         s = "".join(self.event) + pending.data
-        self.reader.error("`%r' not bound" % s)
+        self.reader.error("'%r' not bound" % s)
 
 
 class invalid_command(Command):
     def do(self) -> None:
         s = self.event_name
-        self.reader.error("command `%s' not known" % s)
+        self.reader.error("command '%s' not known" % s)
 
 
 class show_history(Command):

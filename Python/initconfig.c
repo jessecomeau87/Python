@@ -2388,7 +2388,7 @@ config_usage(int error, const wchar_t* program)
 
     fprintf(f, usage_line, program);
     if (error)
-        fprintf(f, "Try `python -h' for more information.\n");
+        fprintf(f, "Try 'python -h' for more information.\n");
     else {
         fputs(usage_help, f);
     }

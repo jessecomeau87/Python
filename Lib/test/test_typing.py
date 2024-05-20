@@ -6182,7 +6182,7 @@ class ForwardRefTests(BaseTestCase):
         # See https://bugs.python.org/issue46571
         class Other:
             o: int
-        class B:  # Has the same `__name__`` as `A.B` and different `__qualname__`
+        class B:  # Has the same `__name__` as `A.B` and different `__qualname__`
             o: int
         @no_type_check
         class A:

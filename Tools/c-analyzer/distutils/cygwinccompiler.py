@@ -188,7 +188,7 @@ class Mingw32CCompiler(CygwinCCompiler):
                                            entry_point))
         # Maybe we should also append -mthreads, but then the finished
         # dlls need another dll (mingwm10.dll see Mingw32 docs)
-        # (-mthreads: Support thread-safe exception handling on `Mingw32')
+        # (-mthreads: Support thread-safe exception handling on Mingw32)
 
         # no additional libraries needed
         self.dll_libraries=[]

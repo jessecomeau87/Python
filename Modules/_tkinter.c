@@ -546,8 +546,8 @@ Tcl_AppInit(Tcl_Interp *interp)
 
 
 
-/* Initialize the Tk application; see the `main' function in
- * `tkMain.c'.
+/* Initialize the Tk application; see the 'main' function in
+ * 'tkMain.c'.
  */
 
 static void EnableEventHook(void); /* Forward */

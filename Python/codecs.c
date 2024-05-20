@@ -1496,7 +1496,7 @@ _PyCodec_InitRegistry(PyInterpreterState *interp)
 
     interp->codecs.initialized = 1;
 
-    // Importing `encodings' will call back into this module to register codec
+    // Importing 'encodings' will call back into this module to register codec
     // search functions, so this is done after everything else is initialized.
     PyObject *mod = PyImport_ImportModule("encodings");
     if (mod == NULL) {

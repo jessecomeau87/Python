@@ -382,7 +382,7 @@ enum flagstates {collecting_clear_unreachable_clear,
 // What's checked:
 // - The `head` pointers are not polluted.
 // - The objects' PREV_MASK_COLLECTING and NEXT_MASK_UNREACHABLE flags are all
-//   `set or clear, as specified by the 'flags' argument.
+//   set or clear, as specified by the 'flags' argument.
 // - The prev and next pointers are mutually consistent.
 static void
 validate_list(PyGC_Head *head, enum flagstates flags)
