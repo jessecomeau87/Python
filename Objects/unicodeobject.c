@@ -13115,6 +13115,7 @@ PyUnicodeWriter_Create(void)
         return NULL;
     }
     _PyUnicodeWriter_Init((_PyUnicodeWriter*)writer);
+    PyUnicodeWriter_SetOverallocate(writer, 1);
     return writer;
 }
 
