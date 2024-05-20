@@ -969,3 +969,82 @@ PyInit__test_shared_gil_only(void)
 {
     return PyModuleDef_Init(&shared_gil_only_def);
 }
+
+
+#include "datetime.h"
+
+static int
+datetime_capi_import_with_error(void)
+{
+    static int is_datetime_multiphase = -1;
+    int ismain = PyInterpreterState_Get() == PyInterpreterState_Main();
+    if (ismain && is_datetime_multiphase < 0) {
+        PyObject *module = PyImport_ImportModule("_datetime");
+        if (module == NULL) {
+            return -1;
+        }
+        PyModuleDef *def = PyModule_GetDef(module);
+        Py_DECREF(module);
+        if (def && def->m_size >= 0) {
+            is_datetime_multiphase = 1;
+        }
+        else {
+            is_datetime_multiphase = 0;
+        }
+    }
+    if (is_datetime_multiphase < 0) {
+        PyErr_SetString(PyExc_AssertionError,
+                        "Main interpreter must be tested first.");
+        return -1;
+    }
+
+    _PyDateTimeAPI_Import();
+    if (!PyErr_Occurred()) {
+        return 0;
+    }
+#ifdef Py_GIL_DISABLED
+    if (!ismain && !is_datetime_multiphase) {
+        // _datetime module and Capsule are not imported
+        PyErr_WriteUnraisable(NULL);
+        return 0;
+    }
+#endif
+    return -1;
+}
+
+static int
+datetime_capi_client_exec(PyObject *m)
+{
+    _PyDateTimeAPI_Get = _PyDateTimeAPI_not_ready;
+    if (_PyDateTimeAPI_Get() != NULL) {
+        PyErr_SetString(PyExc_AssertionError,
+                        "DateTime API is expected to remain NULL.");
+        return -1;
+    }
+    if (datetime_capi_import_with_error() < 0) {
+        return -1;
+    }
+    if (PyDateTimeAPI != PyCapsule_Import(PyDateTime_CAPSULE_NAME, 0)) {
+        PyErr_SetString(PyExc_AssertionError,
+                        "DateTime API does not match Capsule CAPI.");
+        return -1;
+    }
+    PyErr_Clear();
+    return 0;
+}
+
+static PyModuleDef_Slot datetime_capi_client_slots[] = {
+    {Py_mod_exec, datetime_capi_client_exec},
+    {Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
+    {Py_mod_gil, Py_MOD_GIL_NOT_USED},
+    {0, NULL},
+};
+
+static PyModuleDef datetime_capi_client_def = TEST_MODULE_DEF(
+    "_testmultiphase_datetime_capi_client", datetime_capi_client_slots, NULL);
+
+PyMODINIT_FUNC
+PyInit__test_datetime_capi_client(void)
+{
+    return PyModuleDef_Init(&datetime_capi_client_def);
+}
