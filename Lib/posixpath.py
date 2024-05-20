@@ -22,6 +22,7 @@ defpath = '/bin:/usr/bin'
 altsep = None
 devnull = '/dev/null'
 
+import errno
 import os
 import sys
 import stat
@@ -449,6 +450,9 @@ symbolic links encountered in the path."""
     # the same links.
     seen = {}
 
+    # How many unique symlinks can be read
+    maxlinks = 40  # TODO: use limit set by OS
+
     while rest:
         name = rest.pop()
         if name is None:
@@ -479,10 +483,11 @@ symbolic links encountered in the path."""
                     continue
                 # The symlink is not resolved, so we must have a symlink loop.
                 if strict:
-                    # Raise OSError(errno.ELOOP)
-                    os.stat(newpath)
+                    raise OSError(errno.ELOOP, "Symlink loop", newpath)
                 path = newpath
                 continue
+            if strict and maxlinks != -1 and len(seen) >= maxlinks:
+                raise OSError(errno.ELOOP, "Too many symbolic links", newpath)
             target = os.readlink(newpath)
         except OSError:
             if strict:
