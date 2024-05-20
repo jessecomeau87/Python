@@ -4489,4 +4489,14 @@
             break;
         }
 
+        case _RETURN_OFFSET: {
+            frame->instr_ptr += frame->return_offset;
+            break;
+        }
+
+        case _YIELD_OFFSET: {
+            frame->instr_ptr += 1 + INLINE_CACHE_ENTRIES_SEND;
+            break;
+        }
+
 #undef TIER_TWO
