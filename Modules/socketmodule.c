@@ -8411,6 +8411,9 @@ socket_exec(PyObject *m)
 #ifdef  IP_TTL
     ADD_INT_MACRO(m, IP_TTL);
 #endif
+#ifdef  IP_RECVERR
+    ADD_INT_MACRO(m, IP_RECVERR);
+#endif
 #ifdef  IP_RECVOPTS
     ADD_INT_MACRO(m, IP_RECVOPTS);
 #endif
@@ -8522,6 +8525,9 @@ socket_exec(PyObject *m)
 #endif
 #ifdef IPV6_RECVDSTOPTS
     ADD_INT_MACRO(m, IPV6_RECVDSTOPTS);
+#endif
+#ifdef  IPV6_RECVERR
+    ADD_INT_MACRO(m, IPV6_RECVERR);
 #endif
 #ifdef IPV6_RECVHOPLIMIT
     ADD_INT_MACRO(m, IPV6_RECVHOPLIMIT);
