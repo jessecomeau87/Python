@@ -556,7 +556,7 @@ _Py_HandleSystemExit(int *exitcode_p)
     }
     assert(PyExceptionInstance_Check(exc));
 
-    /* The error code should be in the `code' attribute. */
+    /* The error code should be in the 'code' attribute. */
     PyObject *code = PyObject_GetAttr(exc, &_Py_ID(code));
     if (code) {
         Py_SETREF(exc, code);

@@ -1165,7 +1165,7 @@ class Enum(metaclass=EnumType):
         # (such as via super when trying to override __new__)
         if not cls._member_map_:
             if getattr(cls, '_%s__in_progress' % cls.__name__, False):
-                raise TypeError('do not use `super().__new__; call the appropriate __new__ directly') from None
+                raise TypeError('do not use `super().__new__`; call the appropriate __new__ directly') from None
             raise TypeError("%r has no members defined" % cls)
         #
         # still not found -- try _missing_ hook

@@ -300,7 +300,7 @@ class HistoricalReader(Reader):
     def get_prompt(self, lineno: int, cursor_on_line: bool) -> str:
         if cursor_on_line and self.isearch_direction != ISEARCH_DIRECTION_NONE:
             d = "rf"[self.isearch_direction == ISEARCH_DIRECTION_FORWARDS]
-            return "(%s-search `%s') " % (d, self.isearch_term)
+            return "(%s-search '%s') " % (d, self.isearch_term)
         else:
             return super().get_prompt(lineno, cursor_on_line)
 

@@ -59,7 +59,7 @@ def _parse_makefile(filename, vars=None, keep_unresolved=True):
 
                     v = int(v)
                 except ValueError:
-                    # insert literal `$'
+                    # insert literal '$'
                     done[n] = v.replace('$$', '$')
                 else:
                     done[n] = v

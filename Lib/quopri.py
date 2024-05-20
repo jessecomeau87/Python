@@ -90,7 +90,7 @@ def encode(input, output, quotetabs, header=False):
         # length limitations.  Then do the thisline->prevline dance.
         thisline = EMPTYSTRING.join(outline)
         while len(thisline) > MAXLINESIZE:
-            # Don't forget to include the soft line break `=' sign in the
+            # Don't forget to include the soft line break '=' sign in the
             # length calculation!
             write(thisline[:MAXLINESIZE-1], lineEnd=b'=\n')
             thisline = thisline[MAXLINESIZE-1:]

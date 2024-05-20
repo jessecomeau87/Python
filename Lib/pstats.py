@@ -735,7 +735,7 @@ if __name__ == '__main__':
             return 0
         def help_sort(self):
             print("Sort profile data according to specified keys.", file=self.stream)
-            print("(Typing `sort' without arguments lists valid keys.)", file=self.stream)
+            print("(Typing 'sort' without arguments lists valid keys.)", file=self.stream)
         def complete_sort(self, text, *args):
             return [a for a in Stats.sort_arg_dict_default if a.startswith(text)]
 

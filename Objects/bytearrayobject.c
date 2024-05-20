@@ -1855,7 +1855,7 @@ bytearray_extend(PyByteArrayObject *self, PyObject *iterable_of_ints)
                 Py_DECREF(bytearray_obj);
                 return NULL;
             }
-            /* Recompute the `buf' pointer, since the resizing operation may
+            /* Recompute the 'buf' pointer, since the resizing operation may
                have invalidated it. */
             buf = PyByteArray_AS_STRING(bytearray_obj);
         }

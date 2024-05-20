@@ -28,8 +28,8 @@ a strict superset of readline's \"KEYSEQ\" format (which is to say
 that if you can come up with a spec readline accepts that this
 doesn't, you've found a bug and should tell me about it).
 
-Note that this is the `\\C-o' style of readline keyspec, not the
-`Control-o' sort.
+Note that this is the '\\C-o' style of readline keyspec, not the
+'Control-o' sort.
 
 A keyspec is a string representing a sequence of keypresses that can
 be bound to a command.
@@ -42,14 +42,14 @@ sequence of charaters produced by hitting KEY.
 
 Examples:
 
-`a'     - what you get when you hit the `a' key
-`\\EOA'  - Escape - O - A (up, on my terminal)
-`\\<UP>' - the up arrow key
-`\\<up>' - ditto (keynames are case insensitive)
-`\\C-o', `\\c-o'  - control-o
-`\\M-.'  - meta-period
-`\\E.'   - ditto (that's how meta works for pyrepl)
-`\\<tab>', `\\<TAB>', `\\t', `\\011', '\\x09', '\\X09', '\\C-i', '\\C-I'
+'a'     - what you get when you hit the 'a' key
+'\\EOA'  - Escape - O - A (up, on my terminal)
+'\\<UP>' - the up arrow key
+'\\<up>' - ditto (keynames are case insensitive)
+'\\C-o', '\\c-o'  - control-o
+'\\M-.'  - meta-period
+'\\E.'   - ditto (that's how meta works for pyrepl)
+'\\<tab>', '\\<TAB>', '\\t', '\\011', '\\x09', '\\X09', '\\C-i', '\\C-I'
    - all of these are the tab character.  Can you think of any more?
 """
 
@@ -124,7 +124,7 @@ def _parse_key1(key, s):
             elif c == "c":
                 if key[s + 2] != "-":
                     raise KeySpecError(
-                        "\\C must be followed by `-' (char %d of %s)"
+                        "\\C must be followed by '-' (char %d of %s)"
                         % (s + 2, repr(key))
                     )
                 if ctrl:
@@ -136,7 +136,7 @@ def _parse_key1(key, s):
             elif c == "m":
                 if key[s + 2] != "-":
                     raise KeySpecError(
-                        "\\M must be followed by `-' (char %d of %s)"
+                        "\\M must be followed by '-' (char %d of %s)"
                         % (s + 2, repr(key))
                     )
                 if meta:
@@ -163,7 +163,7 @@ def _parse_key1(key, s):
                 ret = key[s + 2 : t].lower()
                 if ret not in _keynames:
                     raise KeySpecError(
-                        "unrecognised keyname `%s' at char %d of %s"
+                        "unrecognised keyname '%s' at char %d of %s"
                         % (ret, s + 2, repr(key))
                     )
                 ret = _keynames[ret]

@@ -1444,7 +1444,7 @@ XML_ExternalEntityParserCreate(XML_Parser oldParser, const XML_Char *context,
 #endif /* XML_DTD */
 
   /* Note that the magical uses of the pre-processor to make field
-     access look more like C++ require that `parser' be overwritten
+     access look more like C++ require that 'parser' be overwritten
      here.  This makes this function more painful to follow than it
      would be otherwise.
   */

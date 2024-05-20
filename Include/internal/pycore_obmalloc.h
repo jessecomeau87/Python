@@ -163,7 +163,7 @@ typedef unsigned int pymem_uint;  /* assuming >= 16 bits */
  * things simpler, we assume that it is 4K, which is OK for most systems.
  * It is probably better if this is the native page size, but it doesn't
  * have to be.  In theory, if SYSTEM_PAGE_SIZE is larger than the native page
- * size, then `POOL_ADDR(p)->arenaindex' could rarely cause a segmentation
+ * size, then 'POOL_ADDR(p)->arenaindex' could rarely cause a segmentation
  * violation fault.  4K is apparently OK for all the platforms that python
  * currently targets.
  */

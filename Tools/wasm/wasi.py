@@ -105,7 +105,7 @@ def call(command, *, quiet, **kwargs):
 
 def build_platform():
     """The name of the build/host platform."""
-    # Can also be found via `config.guess`.`
+    # Can also be found via `config.guess`.
     return sysconfig.get_config_var("BUILD_GNU_TYPE")
 
 

@@ -285,7 +285,7 @@ def _dec_str_to_int_inner(s, *, GUARD=8):
         if w <= BYTELIM:
             # XXX Stefan Pochmann discovered that, for 1024-bit ints,
             # `int(Decimal)` took 2.5x longer than `int(str(Decimal))`.
-            # Worse, `int(Decimal) is still quadratic-time for much
+            # Worse, `int(Decimal)` is still quadratic-time for much
             # larger ints. So unless/until all that is repaired, the
             # seemingly redundant `str(Decimal)` is crucial to speed.
             result.extend(int(str(n)).to_bytes(w)) # big-endian default

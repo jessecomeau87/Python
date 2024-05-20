@@ -566,7 +566,7 @@ def install(domain, localedir=None, *, names=None):
 
 # a mapping b/w domains and locale directories
 _localedirs = {}
-# current global domain, `messages' used for compatibility w/ GNU gettext
+# current global domain, 'messages' used for compatibility w/ GNU gettext
 _current_domain = 'messages'
 
 

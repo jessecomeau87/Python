@@ -405,8 +405,8 @@ Note that options interpreted by the Python interpreter itself
 are not placed in
 .IR sys.argv .
 .PP
-In interactive mode, the primary prompt is `>>>'; the second prompt
-(which appears when a command is not complete) is `...'.
+In interactive mode, the primary prompt is '>>>'; the second prompt
+(which appears when a command is not complete) is '...'.
 The prompts can be changed by assignment to
 .I sys.ps1
 or
