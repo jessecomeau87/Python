@@ -1057,6 +1057,14 @@ PyObject_ClearWeakRefs(PyObject *object)
     PyErr_SetRaisedException(exc);
 }
 
+void
+PyUnstable_Object_ClearWeakRefsExceptCallbacks(PyObject *obj)
+{
+    if (_PyType_SUPPORTS_WEAKREFS(Py_TYPE(obj))) {
+        _PyWeakref_ClearWeakRefsExceptCallbacks(obj);
+    }
+}
+
 /* This function is called by _PyStaticType_Dealloc() to clear weak references.
  *
  * This is called at the end of runtime finalization, so we can just
