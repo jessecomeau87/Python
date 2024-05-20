@@ -39,6 +39,10 @@ struct _Py_long_state {
     int max_str_digits;
 };
 
+struct _getargs_runtime_state {
+    struct _PyArg_Parser *static_parsers;
+};
+
 
 /* cross-interpreter data registry */
 
@@ -230,6 +234,8 @@ struct _is {
 
    /* the initial PyInterpreterState.threads.head */
     PyThreadState _initial_thread;
+
+    struct _getargs_runtime_state getargs;
 };
 
 
