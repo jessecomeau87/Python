@@ -699,6 +699,7 @@ extern "C" {
     INIT_ID(__reduce__), \
     INIT_ID(__reduce_ex__), \
     INIT_ID(__release_buffer__), \
+    INIT_ID(__replace__), \
     INIT_ID(__repr__), \
     INIT_ID(__reversed__), \
     INIT_ID(__rfloordiv__), \
@@ -800,6 +801,7 @@ extern "C" {
     INIT_ID(as_integer_ratio), \
     INIT_ID(asend), \
     INIT_ID(ast), \
+    INIT_ID(astimezone), \
     INIT_ID(athrow), \
     INIT_ID(attribute), \
     INIT_ID(authorizer_callback), \
@@ -864,6 +866,7 @@ extern "C" {
     INIT_ID(co_varnames), \
     INIT_ID(code), \
     INIT_ID(col_offset), \
+    INIT_ID(combine), \
     INIT_ID(command), \
     INIT_ID(comment_factory), \
     INIT_ID(compile_mode), \
@@ -876,11 +879,14 @@ extern "C" {
     INIT_ID(coro), \
     INIT_ID(count), \
     INIT_ID(covariant), \
+    INIT_ID(ctime), \
     INIT_ID(cwd), \
     INIT_ID(d), \
     INIT_ID(data), \
     INIT_ID(database), \
+    INIT_ID(date), \
     INIT_ID(day), \
+    INIT_ID(days), \
     INIT_ID(decode), \
     INIT_ID(decoder), \
     INIT_ID(default), \
@@ -957,7 +963,10 @@ extern "C" {
     INIT_ID(follow_symlinks), \
     INIT_ID(format), \
     INIT_ID(from_param), \
+    INIT_ID(fromisocalendar), \
+    INIT_ID(fromisoformat), \
     INIT_ID(fromlist), \
+    INIT_ID(fromordinal), \
     INIT_ID(fromtimestamp), \
     INIT_ID(fromutc), \
     INIT_ID(fset), \
@@ -1016,8 +1025,10 @@ extern "C" {
     INIT_ID(is_running), \
     INIT_ID(isatty), \
     INIT_ID(isinstance), \
+    INIT_ID(isocalendar), \
     INIT_ID(isoformat), \
     INIT_ID(isolation_level), \
+    INIT_ID(isoweekday), \
     INIT_ID(istext), \
     INIT_ID(item), \
     INIT_ID(items), \
@@ -1062,6 +1073,7 @@ extern "C" {
     INIT_ID(manual_reset), \
     INIT_ID(mapping), \
     INIT_ID(match), \
+    INIT_ID(max), \
     INIT_ID(max_length), \
     INIT_ID(maxdigits), \
     INIT_ID(maxevents), \
@@ -1076,7 +1088,9 @@ extern "C" {
     INIT_ID(metadata), \
     INIT_ID(method), \
     INIT_ID(microsecond), \
+    INIT_ID(microseconds), \
     INIT_ID(milliseconds), \
+    INIT_ID(min), \
     INIT_ID(minute), \
     INIT_ID(mod), \
     INIT_ID(mode), \
@@ -1108,6 +1122,7 @@ extern "C" {
     INIT_ID(nlocals), \
     INIT_ID(node_depth), \
     INIT_ID(node_offset), \
+    INIT_ID(now), \
     INIT_ID(ns), \
     INIT_ID(nstype), \
     INIT_ID(nt), \
@@ -1183,6 +1198,7 @@ extern "C" {
     INIT_ID(reserved), \
     INIT_ID(reset), \
     INIT_ID(resetids), \
+    INIT_ID(resolution), \
     INIT_ID(return), \
     INIT_ID(reverse), \
     INIT_ID(reversed), \
@@ -1191,6 +1207,7 @@ extern "C" {
     INIT_ID(sched_priority), \
     INIT_ID(scheduler), \
     INIT_ID(second), \
+    INIT_ID(seconds), \
     INIT_ID(security_attributes), \
     INIT_ID(seek), \
     INIT_ID(seekable), \
@@ -1236,6 +1253,7 @@ extern "C" {
     INIT_ID(strict), \
     INIT_ID(strict_mode), \
     INIT_ID(string), \
+    INIT_ID(strptime), \
     INIT_ID(sub_key), \
     INIT_ID(symmetric_difference_update), \
     INIT_ID(tabsize), \
@@ -1253,10 +1271,16 @@ extern "C" {
     INIT_ID(text), \
     INIT_ID(threading), \
     INIT_ID(throw), \
+    INIT_ID(time), \
     INIT_ID(timeout), \
     INIT_ID(times), \
+    INIT_ID(timestamp), \
     INIT_ID(timetuple), \
+    INIT_ID(timetz), \
+    INIT_ID(today), \
+    INIT_ID(toordinal), \
     INIT_ID(top), \
+    INIT_ID(total_seconds), \
     INIT_ID(trace_callback), \
     INIT_ID(traceback), \
     INIT_ID(trailers), \
@@ -1275,6 +1299,11 @@ extern "C" {
     INIT_ID(unraisablehook), \
     INIT_ID(uri), \
     INIT_ID(usedforsecurity), \
+    INIT_ID(utc), \
+    INIT_ID(utcfromtimestamp), \
+    INIT_ID(utcnow), \
+    INIT_ID(utcoffset), \
+    INIT_ID(utctimetuple), \
     INIT_ID(value), \
     INIT_ID(values), \
     INIT_ID(version), \
