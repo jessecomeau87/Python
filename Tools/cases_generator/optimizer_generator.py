@@ -38,7 +38,7 @@ def validate_uop(override: Uop, uop: Uop) -> None:
 def type_name(var: StackItem) -> str:
     if var.is_array():
         return f"_Py_UopsSymbol **"
-    if var.type:
+    if var.type and var.type.strip() != "PyObject *":
         return var.type
     return f"_Py_UopsSymbol *"
 
@@ -106,12 +106,13 @@ def write_uop(
         for var in reversed(prototype.stack.inputs):
             res = stack.pop(var)
             if not skip_inputs:
-                out.emit(res)
+                for line in res:
+                    out.emit(line)
         if not prototype.properties.stores_sp:
             for i, var in enumerate(prototype.stack.outputs):
-                res = stack.push(var)
+                temp = stack.push(var)
                 if not var.peek or is_override:
-                    out.emit(res)
+                    out.emit(temp)
         if debug:
             args = []
             for var in prototype.stack.inputs:
@@ -139,9 +140,10 @@ def write_uop(
         if prototype.properties.stores_sp:
             for i, var in enumerate(prototype.stack.outputs):
                 if not var.peek or is_override:
-                    out.emit(stack.push(var))
+                    for line in stack.push(var):
+                        out.emit(line)
         out.start_line()
-        stack.flush(out, cast_type="_Py_UopsSymbol *")
+        stack.flush(out, cast_type="_Py_UopsSymbol *", should_tag=False)
     except SizeMismatch as ex:
         raise analysis_error(ex.args[0], uop.body[0])
 

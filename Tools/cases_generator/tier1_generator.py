@@ -41,20 +41,28 @@ def declare_variables(inst: Instruction, out: CWriter) -> None:
         if isinstance(uop, Uop):
             for var in reversed(uop.stack.inputs):
                 if var.name not in variables:
-                    type = var.type if var.type else "PyObject *"
                     variables.add(var.name)
                     if var.condition:
-                        out.emit(f"{type}{var.name} = NULL;\n")
+                        out.emit(f"_PyStackRef {var.name} = Py_STACKREF_NULL;\n")
                     else:
-                        out.emit(f"{type}{var.name};\n")
+                        if var.is_array():
+                            out.emit(f"{var.type} {var.name};\n")
+                        else:
+                            out.emit(f"_PyStackRef {var.name};\n")
             for var in uop.stack.outputs:
                 if var.name not in variables:
                     variables.add(var.name)
-                    type = var.type if var.type else "PyObject *"
+                    type = var.type if var.type else "PyStackRef "
                     if var.condition:
-                        out.emit(f"{type}{var.name} = NULL;\n")
+                        if type.strip() == "PyStackRef":
+                            out.emit(f"_PyStackRef {var.name} = Py_STACKREF_NULL;\n")
+                        else:
+                            out.emit(f"{type}{var.name} = NULL;\n")
                     else:
-                        out.emit(f"{type}{var.name};\n")
+                        if type.strip() == "PyStackRef":
+                            out.emit(f"_PyStackRef {var.name};\n")
+                        else:
+                            out.emit(f"{type}{var.name};\n")
 
 
 def write_uop(
@@ -70,7 +78,8 @@ def write_uop(
         if braces:
             out.emit(f"// {uop.name}\n")
         for var in reversed(uop.stack.inputs):
-            out.emit(stack.pop(var))
+            for line in stack.pop(var):
+                out.emit(line)
         if braces:
             out.emit("{\n")
         if not uop.properties.stores_sp:

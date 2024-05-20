@@ -111,7 +111,7 @@ class StackItem:
         return f"{type}{self.name}{size}{cond} {self.peek}"
 
     def is_array(self) -> bool:
-        return self.type == "PyObject **"
+        return self.type == "_PyStackRef *"
 
 
 @dataclass
@@ -352,6 +352,19 @@ def has_error_without_pop(op: parser.InstDef) -> bool:
 
 
 NON_ESCAPING_FUNCTIONS = (
+    "PyObject_To_StackRef_Steal",
+    "PyStackRef_To_PyObject_Borrow",
+    "PyStackRef_To_PyObject_New",
+    "PyStackRef_DECREF",
+    "PyStackRef_DECREF",
+    "PyStackRef_INCREF",
+    "PyStackRef_NewRef",
+    "PyStackRef_XNewRef",
+    "PyStackRef_CLEAR",
+    "PyStackRef_SETREF",
+    "PyStackRef_IsNull",
+    "PyStackRef_XSETREF",
+    "PyObject_To_StackRef_New",
     "Py_INCREF",
     "_PyManagedDictPointer_IsValues",
     "_PyObject_GetManagedDict",
@@ -398,8 +411,9 @@ NON_ESCAPING_FUNCTIONS = (
     "_PyFrame_SetStackPointer",
     "_PyType_HasFeature",
     "PyUnicode_Concat",
-    "_PyList_FromArraySteal",
+    "_PyList_FromStackSteal",
     "_PyTuple_FromArraySteal",
+    "_PyTuple_FromStackSteal",
     "PySlice_New",
     "_Py_LeaveRecursiveCallPy",
     "CALL_STAT_INC",

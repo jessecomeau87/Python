@@ -124,7 +124,7 @@ class Stack:
         self.variables: list[StackItem] = []
         self.defined: set[str] = set()
 
-    def pop(self, var: StackItem) -> str:
+    def pop(self, var: StackItem) -> tuple[str, ...]:
         self.top_offset.pop(var)
         if not var.peek:
             self.peek_offset.pop(var)
@@ -137,34 +137,45 @@ class Stack:
                     f"Expected {var.size} got {popped.size}"
                 )
             if popped.name == var.name:
-                return ""
+                return ("", )
             elif popped.name in UNUSED:
                 self.defined.add(var.name)
-                return (
-                    f"{var.name} = {indirect}stack_pointer[{self.top_offset.to_c()}];\n"
-                )
+                if indirect:
+                    return (
+                        f"{var.name} = {indirect}stack_pointer[{self.top_offset.to_c()}];\n",
+                    )
+                else:
+                    return (
+                        f"{var.name} = stack_pointer[{self.top_offset.to_c()}];\n",
+                    )
             elif var.name in UNUSED:
-                return ""
+                return ("", )
             else:
                 self.defined.add(var.name)
-                return f"{var.name} = {popped.name};\n"
+                res = [f"{var.name} = {popped.name};\n"]
+                return tuple(res)
         self.base_offset.pop(var)
         if var.name in UNUSED:
-            return ""
+            return ("", )
         else:
             self.defined.add(var.name)
-        cast = f"({var.type})" if (not indirect and var.type) else ""
-        assign = (
-            f"{var.name} = {cast}{indirect}stack_pointer[{self.base_offset.to_c()}];"
-        )
+        cast = f"({var.type})" if (not indirect and var.type and var.type.strip() != "PyObject *") else ""
+        if indirect:
+            assign: tuple[str, ...] = (
+                f"{var.name} = {indirect}stack_pointer[{self.base_offset.to_c()}];",
+            )
+        else:
+            assign = (
+                f"{var.name} = stack_pointer[{self.base_offset.to_c()}];\n",
+            )
         if var.condition:
             if var.condition == "1":
-                return f"{assign}\n"
+                return (*assign, "\n")
             elif var.condition == "0":
-                return ""
+                return ("", )
             else:
-                return f"if ({var.condition}) {{ {assign} }}\n"
-        return f"{assign}\n"
+                return (f"if ({var.condition}) {{\n", *assign,  "}\n", )
+        return (*assign, "\n")
 
     def push(self, var: StackItem) -> str:
         self.variables.append(var)
@@ -177,20 +188,27 @@ class Stack:
             self.top_offset.push(var)
             return ""
 
-    def flush(self, out: CWriter, cast_type: str = "PyObject *") -> None:
+    def flush(self, out: CWriter, cast_type: str = "PyObject *", should_tag: bool = True) -> None:
         out.start_line()
         for var in self.variables:
             if not var.peek:
-                cast = f"({cast_type})" if var.type else ""
+                type = var.type or ""
+                cast = f"({cast_type})" if (type and type.strip() != "_PyStackRef") else ""
                 if var.name not in UNUSED and not var.is_array():
                     if var.condition:
                         if var.condition == "0":
                             continue
                         elif var.condition != "1":
                             out.emit(f"if ({var.condition}) ")
-                    out.emit(
-                        f"stack_pointer[{self.base_offset.to_c()}] = {cast}{var.name};\n"
-                    )
+                    tag = "PyObject_To_StackRef_Steal" if should_tag and type.strip() else ""
+                    if tag:
+                        out.emit(
+                            f"stack_pointer[{self.base_offset.to_c()}] = {tag}({cast}{var.name});\n"
+                        )
+                    else:
+                        out.emit(
+                            f"stack_pointer[{self.base_offset.to_c()}] = {cast}{var.name};\n"
+                        )
             self.base_offset.push(var)
         if self.base_offset.to_c() != self.top_offset.to_c():
             print("base", self.base_offset.to_c(), "top", self.top_offset.to_c())

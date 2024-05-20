@@ -71,7 +71,7 @@
 #endif
 
 #if USE_COMPUTED_GOTOS
-#  define TARGET(op) TARGET_##op:
+#  define TARGET(op) TARGET_##op: /* {fprintf(stderr, "OP %s\n", _PyOpcode_OpName[opcode]);} */
 #  define DISPATCH_GOTO() goto *opcode_targets[opcode]
 #else
 #  define TARGET(op) case op: TARGET_##op:
@@ -262,9 +262,9 @@ GETITEM(PyObject *v, Py_ssize_t i) {
    This is because it is possible that during the DECREF the frame is
    accessed by other code (e.g. a __del__ method or gc.collect()) and the
    variable would be pointing to already-freed memory. */
-#define SETLOCAL(i, value)      do { PyObject *tmp = GETLOCAL(i); \
+#define SETLOCAL(i, value)      do { _PyStackRef tmp = GETLOCAL(i); \
                                      GETLOCAL(i) = value; \
-                                     Py_XDECREF(tmp); } while (0)
+                                     PyStackRef_DECREF(tmp); } while (0)
 
 #define GO_TO_INSTRUCTION(op) goto PREDICT_ID(op)
 

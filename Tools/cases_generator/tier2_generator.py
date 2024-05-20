@@ -38,10 +38,10 @@ def declare_variable(
 ) -> None:
     if var.name in variables:
         return
-    type = var.type if var.type else "PyObject *"
+    type = var.type if var.type else "_PyStackRef "
     variables.add(var.name)
     if var.condition:
-        out.emit(f"{type}{var.name} = NULL;\n")
+        out.emit(f"_PyStackRef {var.name} = Py_STACKREF_NULL;\n")
         if uop.replicates:
             # Replicas may not use all their conditional variables
             # So avoid a compiler warning with a fake use
@@ -163,7 +163,8 @@ def write_uop(uop: Uop, out: CWriter, stack: Stack) -> None:
             out.emit(f"oparg = {uop.properties.const_oparg};\n")
             out.emit(f"assert(oparg == CURRENT_OPARG());\n")
         for var in reversed(uop.stack.inputs):
-            out.emit(stack.pop(var))
+            for line in stack.pop(var):
+                out.emit(line)
         if not uop.properties.stores_sp:
             for i, var in enumerate(uop.stack.outputs):
                 out.emit(stack.push(var))
