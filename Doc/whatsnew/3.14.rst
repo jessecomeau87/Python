@@ -155,6 +155,12 @@ typing
 * Remove :class:`!typing.ByteString`. It had previously raised a
   :exc:`DeprecationWarning` since Python 3.12.
 
+urllib
+------
+
+* Remove deprecated ``Quoter`` class from :mod:`urllib.parse`.
+  It had previously raised a :exc:`DeprecationWarning` since Python 3.11.
+
 Others
 ------
 
