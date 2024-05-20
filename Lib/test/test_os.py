@@ -10,16 +10,19 @@ import errno
 import fnmatch
 import fractions
 import itertools
+import io
 import locale
 import os
 import pickle
 import platform
+import random
 import select
 import selectors
 import shutil
 import signal
 import socket
 import stat
+import string
 import struct
 import subprocess
 import sys
@@ -29,6 +32,7 @@ import textwrap
 import time
 import types
 import unittest
+import unittest.mock
 import uuid
 import warnings
 from test import support
@@ -70,7 +74,7 @@ except ImportError:
 
 from test.support.script_helper import assert_python_ok
 from test.support import unix_shell
-from test.support.os_helper import FakePath
+from test.support.os_helper import FakePath, TESTFN
 
 
 root_in_posix = False
@@ -5410,6 +5414,946 @@ if hasattr(os, "_fspath"):
         """Explicitly test the pure Python implementation of os.fspath()."""
 
         fspath = staticmethod(os._fspath)
+
+def write_file(path, content, binary=False):
+    """Write *content* to a file located at *path*.
+
+    If *path* is a tuple instead of a string, os.path.join will be used to
+    make a path.  If *binary* is true, the file will be opened in binary
+    mode.
+    """
+    if isinstance(path, tuple):
+        path = os.path.join(*path)
+    mode = 'wb' if binary else 'w'
+    encoding = None if binary else "utf-8"
+    with open(path, mode, encoding=encoding) as fp:
+        fp.write(content)
+
+def write_test_file(path, size):
+    """Create a test file with an arbitrary size and random text content."""
+    def chunks(total, step):
+        assert total >= step
+        while total > step:
+            yield step
+            total -= step
+        if total:
+            yield total
+
+    bufsize = min(size, 8192)
+    chunk = b"".join([random.choice(string.ascii_letters).encode()
+                      for i in range(bufsize)])
+    with open(path, 'wb') as f:
+        for csize in chunks(size, bufsize):
+            f.write(chunk)
+    assert os.path.getsize(path) == size
+
+def read_file(path, binary=False):
+    """Return contents from a file located at *path*.
+
+    If *path* is a tuple instead of a string, os.path.join will be used to
+    make a path.  If *binary* is true, the file will be opened in binary
+    mode.
+    """
+    if isinstance(path, tuple):
+        path = os.path.join(*path)
+    mode = 'rb' if binary else 'r'
+    encoding = None if binary else "utf-8"
+    with open(path, mode, encoding=encoding) as fp:
+        return fp.read()
+
+def supports_file2file_sendfile():
+    # ...apparently Linux and Solaris are the only ones
+    if not hasattr(os, "sendfile"):
+        return False
+    srcname = None
+    dstname = None
+    try:
+        with tempfile.NamedTemporaryFile("wb", dir=os.getcwd(), delete=False) as f:
+            srcname = f.name
+            f.write(b"0123456789")
+
+        with open(srcname, "rb") as src:
+            with tempfile.NamedTemporaryFile("wb", dir=os.getcwd(), delete=False) as dst:
+                dstname = dst.name
+                infd = src.fileno()
+                outfd = dst.fileno()
+                try:
+                    os.sendfile(outfd, infd, 0, 2)
+                except OSError:
+                    return False
+                else:
+                    return True
+    finally:
+        if srcname is not None:
+            os_helper.unlink(srcname)
+        if dstname is not None:
+            os_helper.unlink(dstname)
+
+SUPPORTS_SENDFILE = supports_file2file_sendfile()
+TESTFN2 = TESTFN + "2"
+MACOS = sys.platform.startswith("darwin")
+SOLARIS = sys.platform.startswith("sunos")
+AIX = sys.platform[:3] == 'aix'
+
+
+class _CopyTest:
+    def mkdtemp(self, prefix=None):
+        """Create a temporary directory that will be cleaned up.
+
+        Returns the path of the directory.
+        """
+        d = tempfile.mkdtemp(prefix=prefix, dir=os.getcwd())
+        self.addCleanup(os_helper.rmtree, d)
+        return d
+
+
+class TestCopyMode(_CopyTest, unittest.TestCase):
+    @os_helper.skip_unless_symlink
+    def test_copymode_follow_symlinks(self):
+        tmp_dir = self.mkdtemp()
+        src = os.path.join(tmp_dir, 'foo')
+        dst = os.path.join(tmp_dir, 'bar')
+        src_link = os.path.join(tmp_dir, 'baz')
+        dst_link = os.path.join(tmp_dir, 'quux')
+        write_file(src, 'foo')
+        write_file(dst, 'foo')
+        os.symlink(src, src_link)
+        os.symlink(dst, dst_link)
+        os.chmod(src, stat.S_IRWXU|stat.S_IRWXG)
+        # file to file
+        os.chmod(dst, stat.S_IRWXO)
+        self.assertNotEqual(os.stat(src).st_mode, os.stat(dst).st_mode)
+        os.copymode(src, dst)
+        self.assertEqual(os.stat(src).st_mode, os.stat(dst).st_mode)
+        # On Windows, os.chmod does not follow symlinks (issue #15411)
+        # follow src link
+        os.chmod(dst, stat.S_IRWXO)
+        os.copymode(src_link, dst)
+        self.assertEqual(os.stat(src).st_mode, os.stat(dst).st_mode)
+        # follow dst link
+        os.chmod(dst, stat.S_IRWXO)
+        os.copymode(src, dst_link)
+        self.assertEqual(os.stat(src).st_mode, os.stat(dst).st_mode)
+        # follow both links
+        os.chmod(dst, stat.S_IRWXO)
+        os.copymode(src_link, dst_link)
+        self.assertEqual(os.stat(src).st_mode, os.stat(dst).st_mode)
+
+    @unittest.skipUnless(hasattr(os, 'lchmod'), 'requires os.lchmod')
+    @os_helper.skip_unless_symlink
+    def test_copymode_symlink_to_symlink(self):
+        tmp_dir = self.mkdtemp()
+        src = os.path.join(tmp_dir, 'foo')
+        dst = os.path.join(tmp_dir, 'bar')
+        src_link = os.path.join(tmp_dir, 'baz')
+        dst_link = os.path.join(tmp_dir, 'quux')
+        write_file(src, 'foo')
+        write_file(dst, 'foo')
+        os.symlink(src, src_link)
+        os.symlink(dst, dst_link)
+        os.chmod(src, stat.S_IRWXU|stat.S_IRWXG)
+        os.chmod(dst, stat.S_IRWXU)
+        os.lchmod(src_link, stat.S_IRWXO|stat.S_IRWXG)
+        # link to link
+        os.lchmod(dst_link, stat.S_IRWXO)
+        old_mode = os.stat(dst).st_mode
+        os.copymode(src_link, dst_link, follow_symlinks=False)
+        self.assertEqual(os.lstat(src_link).st_mode,
+                         os.lstat(dst_link).st_mode)
+        self.assertEqual(os.stat(dst).st_mode, old_mode)
+        # src link - use chmod
+        os.lchmod(dst_link, stat.S_IRWXO)
+        os.copymode(src_link, dst, follow_symlinks=False)
+        self.assertEqual(os.stat(src).st_mode, os.stat(dst).st_mode)
+        # dst link - use chmod
+        os.lchmod(dst_link, stat.S_IRWXO)
+        os.copymode(src, dst_link, follow_symlinks=False)
+        self.assertEqual(os.stat(src).st_mode, os.stat(dst).st_mode)
+
+    @unittest.skipIf(hasattr(os, 'lchmod'), 'requires os.lchmod to be missing')
+    @os_helper.skip_unless_symlink
+    def test_copymode_symlink_to_symlink_wo_lchmod(self):
+        tmp_dir = self.mkdtemp()
+        src = os.path.join(tmp_dir, 'foo')
+        dst = os.path.join(tmp_dir, 'bar')
+        src_link = os.path.join(tmp_dir, 'baz')
+        dst_link = os.path.join(tmp_dir, 'quux')
+        write_file(src, 'foo')
+        write_file(dst, 'foo')
+        os.symlink(src, src_link)
+        os.symlink(dst, dst_link)
+        os.copymode(src_link, dst_link, follow_symlinks=False)  # silent fail
+
+class TestCopyStat(_CopyTest, unittest.TestCase):
+
+    @os_helper.skip_unless_symlink
+    def test_copystat_symlinks(self):
+        tmp_dir = self.mkdtemp()
+        src = os.path.join(tmp_dir, 'foo')
+        dst = os.path.join(tmp_dir, 'bar')
+        src_link = os.path.join(tmp_dir, 'baz')
+        dst_link = os.path.join(tmp_dir, 'qux')
+        write_file(src, 'foo')
+        src_stat = os.stat(src)
+        os.utime(src, (src_stat.st_atime,
+                       src_stat.st_mtime - 42.0))  # ensure different mtimes
+        write_file(dst, 'bar')
+        self.assertNotEqual(os.stat(src).st_mtime, os.stat(dst).st_mtime)
+        os.symlink(src, src_link)
+        os.symlink(dst, dst_link)
+        if hasattr(os, 'lchmod'):
+            os.lchmod(src_link, stat.S_IRWXO)
+        if hasattr(os, 'lchflags') and hasattr(stat, 'UF_NODUMP'):
+            os.lchflags(src_link, stat.UF_NODUMP)
+        src_link_stat = os.lstat(src_link)
+        # follow
+        if hasattr(os, 'lchmod'):
+            os.copystat(src_link, dst_link, follow_symlinks=True)
+            self.assertNotEqual(src_link_stat.st_mode, os.stat(dst).st_mode)
+        # don't follow
+        os.copystat(src_link, dst_link, follow_symlinks=False)
+        dst_link_stat = os.lstat(dst_link)
+        if os.utime in os.supports_follow_symlinks:
+            for attr in 'st_atime', 'st_mtime':
+                # The modification times may be truncated in the new file.
+                self.assertLessEqual(getattr(src_link_stat, attr),
+                                     getattr(dst_link_stat, attr) + 1)
+        if hasattr(os, 'lchmod'):
+            self.assertEqual(src_link_stat.st_mode, dst_link_stat.st_mode)
+        if hasattr(os, 'lchflags') and hasattr(src_link_stat, 'st_flags'):
+            self.assertEqual(src_link_stat.st_flags, dst_link_stat.st_flags)
+        # tell to follow but dst is not a link
+        os.copystat(src_link, dst, follow_symlinks=False)
+        self.assertTrue(abs(os.stat(src).st_mtime - os.stat(dst).st_mtime) <
+                        00000.1)
+
+    @unittest.skipUnless(hasattr(os, 'chflags') and
+                         hasattr(errno, 'EOPNOTSUPP') and
+                         hasattr(errno, 'ENOTSUP'),
+                         "requires os.chflags, EOPNOTSUPP & ENOTSUP")
+    def test_copystat_handles_harmless_chflags_errors(self):
+        tmpdir = self.mkdtemp()
+        file1 = os.path.join(tmpdir, 'file1')
+        file2 = os.path.join(tmpdir, 'file2')
+        write_file(file1, 'xxx')
+        write_file(file2, 'xxx')
+
+        def make_chflags_raiser(err):
+            ex = OSError()
+
+            def _chflags_raiser(path, flags, *, follow_symlinks=True):
+                ex.errno = err
+                raise ex
+            return _chflags_raiser
+        old_chflags = os.chflags
+        try:
+            for err in errno.EOPNOTSUPP, errno.ENOTSUP:
+                os.chflags = make_chflags_raiser(err)
+                os.copystat(file1, file2)
+            # assert others errors break it
+            os.chflags = make_chflags_raiser(errno.EOPNOTSUPP + errno.ENOTSUP)
+            self.assertRaises(OSError, os.copystat, file1, file2)
+        finally:
+            os.chflags = old_chflags
+
+class TestCopyXAttr(_CopyTest, unittest.TestCase):
+
+    @os_helper.skip_unless_xattr
+    def test_copyxattr(self):
+        tmp_dir = self.mkdtemp()
+        src = os.path.join(tmp_dir, 'foo')
+        write_file(src, 'foo')
+        dst = os.path.join(tmp_dir, 'bar')
+        write_file(dst, 'bar')
+
+        # no xattr == no problem
+        os._copyxattr(src, dst)
+        # common case
+        os.setxattr(src, 'user.foo', b'42')
+        os.setxattr(src, 'user.bar', b'43')
+        os._copyxattr(src, dst)
+        self.assertEqual(sorted(os.listxattr(src)), sorted(os.listxattr(dst)))
+        self.assertEqual(
+                os.getxattr(src, 'user.foo'),
+                os.getxattr(dst, 'user.foo'))
+        # check errors don't affect other attrs
+        os.remove(dst)
+        write_file(dst, 'bar')
+        os_error = OSError(errno.EPERM, 'EPERM')
+
+        def _raise_on_user_foo(fname, attr, val, **kwargs):
+            if attr == 'user.foo':
+                raise os_error
+            else:
+                orig_setxattr(fname, attr, val, **kwargs)
+        try:
+            orig_setxattr = os.setxattr
+            os.setxattr = _raise_on_user_foo
+            os._copyxattr(src, dst)
+            self.assertIn('user.bar', os.listxattr(dst))
+        finally:
+            os.setxattr = orig_setxattr
+        # the source filesystem not supporting xattrs should be ok, too.
+        def _raise_on_src(fname, *, follow_symlinks=True):
+            if fname == src:
+                raise OSError(errno.ENOTSUP, 'Operation not supported')
+            return orig_listxattr(fname, follow_symlinks=follow_symlinks)
+        try:
+            orig_listxattr = os.listxattr
+            os.listxattr = _raise_on_src
+            os._copyxattr(src, dst)
+        finally:
+            os.listxattr = orig_listxattr
+
+        # test that os.copystat copies xattrs
+        src = os.path.join(tmp_dir, 'the_original')
+        srcro = os.path.join(tmp_dir, 'the_original_ro')
+        write_file(src, src)
+        write_file(srcro, srcro)
+        os.setxattr(src, 'user.the_value', b'fiddly')
+        os.setxattr(srcro, 'user.the_value', b'fiddly')
+        os.chmod(srcro, 0o444)
+        dst = os.path.join(tmp_dir, 'the_copy')
+        dstro = os.path.join(tmp_dir, 'the_copy_ro')
+        write_file(dst, dst)
+        write_file(dstro, dstro)
+        os.copystat(src, dst)
+        os.copystat(srcro, dstro)
+        self.assertEqual(os.getxattr(dst, 'user.the_value'), b'fiddly')
+        self.assertEqual(os.getxattr(dstro, 'user.the_value'), b'fiddly')
+
+    @os_helper.skip_unless_symlink
+    @os_helper.skip_unless_xattr
+    @os_helper.skip_unless_dac_override
+    def test_copyxattr_symlinks(self):
+        # On Linux, it's only possible to access non-user xattr for symlinks;
+        # which in turn require root privileges. This test should be expanded
+        # as soon as other platforms gain support for extended attributes.
+        tmp_dir = self.mkdtemp()
+        src = os.path.join(tmp_dir, 'foo')
+        src_link = os.path.join(tmp_dir, 'baz')
+        write_file(src, 'foo')
+        os.symlink(src, src_link)
+        os.setxattr(src, 'trusted.foo', b'42')
+        os.setxattr(src_link, 'trusted.foo', b'43', follow_symlinks=False)
+        dst = os.path.join(tmp_dir, 'bar')
+        dst_link = os.path.join(tmp_dir, 'qux')
+        write_file(dst, 'bar')
+        os.symlink(dst, dst_link)
+        os._copyxattr(src_link, dst_link, follow_symlinks=False)
+        self.assertEqual(os.getxattr(dst_link, 'trusted.foo', follow_symlinks=False), b'43')
+        self.assertRaises(OSError, os.getxattr, dst, 'trusted.foo')
+        os._copyxattr(src_link, dst, follow_symlinks=False)
+        self.assertEqual(os.getxattr(dst, 'trusted.foo'), b'43')
+
+
+class TestCopyFile(_CopyTest, unittest.TestCase):
+    @os_helper.skip_unless_symlink
+    def test_copyfile_symlinks(self):
+        tmp_dir = self.mkdtemp()
+        src = os.path.join(tmp_dir, 'src')
+        dst = os.path.join(tmp_dir, 'dst')
+        dst_link = os.path.join(tmp_dir, 'dst_link')
+        link = os.path.join(tmp_dir, 'link')
+        write_file(src, 'foo')
+        os.symlink(src, link)
+        # don't follow
+        os.copyfile(link, dst_link, follow_symlinks=False)
+        self.assertTrue(os.path.islink(dst_link))
+        self.assertEqual(os.readlink(link), os.readlink(dst_link))
+        # follow
+        os.copyfile(link, dst)
+        self.assertFalse(os.path.islink(dst))
+
+    @unittest.skipUnless(hasattr(os, 'link'), 'requires os.link')
+    def test_dont_copy_file_onto_link_to_itself(self):
+        # bug 851123.
+        os.mkdir(TESTFN)
+        src = os.path.join(TESTFN, 'cheese')
+        dst = os.path.join(TESTFN, 'shop')
+        try:
+            with open(src, 'w', encoding='utf-8') as f:
+                f.write('cheddar')
+            try:
+                os.link(src, dst)
+            except PermissionError as e:
+                self.skipTest('os.link(): %s' % e)
+            self.assertRaises(os.SameFileError, os.copyfile, src, dst)
+            with open(src, 'r', encoding='utf-8') as f:
+                self.assertEqual(f.read(), 'cheddar')
+            os.remove(dst)
+        finally:
+            shutil.rmtree(TESTFN, ignore_errors=True)
+
+    @os_helper.skip_unless_symlink
+    def test_dont_copy_file_onto_symlink_to_itself(self):
+        # bug 851123.
+        os.mkdir(TESTFN)
+        src = os.path.join(TESTFN, 'cheese')
+        dst = os.path.join(TESTFN, 'shop')
+        try:
+            with open(src, 'w', encoding='utf-8') as f:
+                f.write('cheddar')
+            # Using `src` here would mean we end up with a symlink pointing
+            # to TESTFN/TESTFN/cheese, while it should point at
+            # TESTFN/cheese.
+            os.symlink('cheese', dst)
+            self.assertRaises(os.SameFileError, os.copyfile, src, dst)
+            with open(src, 'r', encoding='utf-8') as f:
+                self.assertEqual(f.read(), 'cheddar')
+            os.remove(dst)
+        finally:
+            shutil.rmtree(TESTFN, ignore_errors=True)
+
+    # Issue #3002: copyfile and copytree block indefinitely on named pipes
+    @unittest.skipUnless(hasattr(os, "mkfifo"), 'requires os.mkfifo()')
+    @unittest.skipIf(sys.platform == "vxworks",
+                    "fifo requires special path on VxWorks")
+    def test_copyfile_named_pipe(self):
+        try:
+            os.mkfifo(TESTFN)
+        except PermissionError as e:
+            self.skipTest('os.mkfifo(): %s' % e)
+        try:
+            self.assertRaises(os.SpecialFileError,
+                                os.copyfile, TESTFN, TESTFN2)
+            self.assertRaises(os.SpecialFileError,
+                                os.copyfile, __file__, TESTFN)
+        finally:
+            os.remove(TESTFN)
+
+    def test_copyfile_return_value(self):
+        # copytree returns its destination path.
+        src_dir = self.mkdtemp()
+        dst_dir = self.mkdtemp()
+        dst_file = os.path.join(dst_dir, 'bar')
+        src_file = os.path.join(src_dir, 'foo')
+        write_file(src_file, 'foo')
+        rv = os.copyfile(src_file, dst_file)
+        self.assertTrue(os.path.exists(rv))
+        self.assertEqual(read_file(src_file), read_file(dst_file))
+
+    def test_copyfile_same_file(self):
+        # copyfile() should raise SameFileError if the source and destination
+        # are the same.
+        src_dir = self.mkdtemp()
+        src_file = os.path.join(src_dir, 'foo')
+        write_file(src_file, 'foo')
+        self.assertRaises(os.SameFileError, os.copyfile, src_file, src_file)
+        # But Error should work too, to stay backward compatible.
+        self.assertRaises(os.CopyError, os.copyfile, src_file, src_file)
+        # Make sure file is not corrupted.
+        self.assertEqual(read_file(src_file), 'foo')
+
+    @unittest.skipIf(MACOS or SOLARIS or _winapi, 'On MACOS, Solaris and Windows the errors are not confusing (though different)')
+    # gh-92670: The test uses a trailing slash to force the OS consider
+    # the path as a directory, but on AIX the trailing slash has no effect
+    # and is considered as a file.
+    @unittest.skipIf(AIX, 'Not valid on AIX, see gh-92670')
+    def test_copyfile_nonexistent_dir(self):
+        # Issue 43219
+        src_dir = self.mkdtemp()
+        src_file = os.path.join(src_dir, 'foo')
+        dst = os.path.join(src_dir, 'does_not_exist/')
+        write_file(src_file, 'foo')
+        self.assertRaises(FileNotFoundError, os.copyfile, src_file, dst)
+
+    def test_copyfile_copy_dir(self):
+        # Issue 45234
+        # test copy() and copyfile() raising proper exceptions when src and/or
+        # dst are directories
+        src_dir = self.mkdtemp()
+        src_file = os.path.join(src_dir, 'foo')
+        dir2 = self.mkdtemp()
+        dst = os.path.join(src_dir, 'does_not_exist/')
+        write_file(src_file, 'foo')
+        if sys.platform == "win32":
+            err = PermissionError
+        else:
+            err = IsADirectoryError
+
+        self.assertRaises(err, os.copyfile, src_dir, dst)
+        self.assertRaises(err, os.copyfile, src_file, src_dir)
+        self.assertRaises(err, os.copyfile, dir2, src_dir)
+
+    class Faux(object):
+        _entered = False
+        _exited_with = None
+        _raised = False
+        def __init__(self, raise_in_exit=False, suppress_at_exit=True):
+            self._raise_in_exit = raise_in_exit
+            self._suppress_at_exit = suppress_at_exit
+        def read(self, *args):
+            return ''
+        def __enter__(self):
+            self._entered = True
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            self._exited_with = exc_type, exc_val, exc_tb
+            if self._raise_in_exit:
+                self._raised = True
+                raise OSError("Cannot close")
+            return self._suppress_at_exit
+
+    def test_w_source_open_fails(self):
+        def _open(filename, mode='r'):
+            if filename == 'srcfile':
+                raise OSError('Cannot open "srcfile"')
+            assert 0  # shouldn't reach here.
+
+        with support.swap_attr(io, 'open', _open):
+            with self.assertRaises(OSError):
+                os.copyfile('srcfile', 'destfile')
+
+    @unittest.skipIf(MACOS, "skipped on macOS")
+    def test_w_dest_open_fails(self):
+        srcfile = self.Faux()
+
+        def _open(filename, mode='r'):
+            if filename == 'srcfile':
+                return srcfile
+            if filename == 'destfile':
+                raise OSError('Cannot open "destfile"')
+            assert 0  # shouldn't reach here.
+
+        with support.swap_attr(io, 'open', _open):
+            os.copyfile('srcfile', 'destfile')
+        self.assertTrue(srcfile._entered)
+        self.assertTrue(srcfile._exited_with[0] is OSError)
+        self.assertEqual(srcfile._exited_with[1].args,
+                         ('Cannot open "destfile"',))
+
+    @unittest.skipIf(MACOS, "skipped on macOS")
+    def test_w_dest_close_fails(self):
+        srcfile = self.Faux()
+        destfile = self.Faux(True)
+
+        def _open(filename, mode='r'):
+            if filename == 'srcfile':
+                return srcfile
+            if filename == 'destfile':
+                return destfile
+            assert 0  # shouldn't reach here.
+
+        with support.swap_attr(io, 'open', _open):
+            os.copyfile('srcfile', 'destfile')
+        self.assertTrue(srcfile._entered)
+        self.assertTrue(destfile._entered)
+        self.assertTrue(destfile._raised)
+        self.assertTrue(srcfile._exited_with[0] is OSError)
+        self.assertEqual(srcfile._exited_with[1].args,
+                         ('Cannot close',))
+
+    @unittest.skipIf(MACOS, "skipped on macOS")
+    def test_w_source_close_fails(self):
+
+        srcfile = self.Faux(True)
+        destfile = self.Faux()
+
+        def _open(filename, mode='r'):
+            if filename == 'srcfile':
+                return srcfile
+            if filename == 'destfile':
+                return destfile
+            assert 0  # shouldn't reach here.
+
+        with support.swap_attr(io, 'open', _open):
+            with self.assertRaises(OSError):
+                os.copyfile('srcfile', 'destfile')
+        self.assertTrue(srcfile._entered)
+        self.assertTrue(destfile._entered)
+        self.assertFalse(destfile._raised)
+        self.assertTrue(srcfile._exited_with[0] is None)
+        self.assertTrue(srcfile._raised)
+
+
+class TestCopy(_CopyTest, unittest.TestCase):
+    @unittest.skipUnless(hasattr(os, 'utime'), 'requires os.utime')
+    def test_copy(self):
+        # Ensure that the copied file exists and has the same mode and
+        # modification time bits.
+        fname = 'test.txt'
+        tmpdir = self.mkdtemp()
+        write_file((tmpdir, fname), 'xxx')
+        file1 = os.path.join(tmpdir, fname)
+        tmpdir2 = self.mkdtemp()
+        file2 = os.path.join(tmpdir2, fname)
+        os.copy(file1, file2)
+        self.assertTrue(os.path.exists(file2))
+        file1_stat = os.stat(file1)
+        file2_stat = os.stat(file2)
+        self.assertEqual(file1_stat.st_mode, file2_stat.st_mode)
+        for attr in 'st_atime', 'st_mtime':
+            # The modification times may be truncated in the new file.
+            self.assertLessEqual(getattr(file1_stat, attr),
+                                 getattr(file2_stat, attr) + 1)
+        if hasattr(os, 'chflags') and hasattr(file1_stat, 'st_flags'):
+            self.assertEqual(getattr(file1_stat, 'st_flags'),
+                             getattr(file2_stat, 'st_flags'))
+
+    @os_helper.skip_unless_symlink
+    def test_copy_symlinks(self):
+        tmp_dir = self.mkdtemp()
+        src = os.path.join(tmp_dir, 'foo')
+        dst = os.path.join(tmp_dir, 'bar')
+        src_link = os.path.join(tmp_dir, 'baz')
+        write_file(src, 'foo')
+        os.symlink(src, src_link)
+        if hasattr(os, 'lchmod'):
+            os.lchmod(src_link, stat.S_IRWXU | stat.S_IRWXO)
+        if hasattr(os, 'lchflags') and hasattr(stat, 'UF_NODUMP'):
+            os.lchflags(src_link, stat.UF_NODUMP)
+        src_stat = os.stat(src)
+        src_link_stat = os.lstat(src_link)
+        # follow
+        os.copy(src_link, dst, follow_symlinks=True)
+        self.assertFalse(os.path.islink(dst))
+        self.assertEqual(read_file(src), read_file(dst))
+        os.remove(dst)
+        # don't follow
+        os.copy(src_link, dst, follow_symlinks=False)
+        self.assertTrue(os.path.islink(dst))
+        self.assertEqual(os.readlink(dst), os.readlink(src_link))
+        dst_stat = os.lstat(dst)
+        if os.utime in os.supports_follow_symlinks:
+            for attr in 'st_atime', 'st_mtime':
+                # The modification times may be truncated in the new file.
+                self.assertLessEqual(getattr(src_link_stat, attr),
+                                     getattr(dst_stat, attr) + 1)
+        if hasattr(os, 'lchmod'):
+            self.assertEqual(src_link_stat.st_mode, dst_stat.st_mode)
+            self.assertNotEqual(src_stat.st_mode, dst_stat.st_mode)
+        if hasattr(os, 'lchflags') and hasattr(src_link_stat, 'st_flags'):
+            self.assertEqual(src_link_stat.st_flags, dst_stat.st_flags)
+
+    @os_helper.skip_unless_xattr
+    def test_copy_xattr(self):
+        tmp_dir = self.mkdtemp()
+        src = os.path.join(tmp_dir, 'foo')
+        dst = os.path.join(tmp_dir, 'bar')
+        write_file(src, 'foo')
+        os.setxattr(src, 'user.foo', b'42')
+        os.copy(src, dst)
+        self.assertEqual(
+                os.getxattr(src, 'user.foo'),
+                os.getxattr(dst, 'user.foo'))
+        os.remove(dst)
+
+    def test_copy_dir(self):
+        src_dir = self.mkdtemp()
+        src_file = os.path.join(src_dir, 'foo')
+        dir2 = self.mkdtemp()
+        dst = os.path.join(src_dir, 'does_not_exist/')
+        write_file(src_file, 'foo')
+        if sys.platform == "win32":
+            err = PermissionError
+        else:
+            err = IsADirectoryError
+        self.assertRaises(err, os.copy, dir2, src_dir)
+
+        # raise *err* because of src rather than FileNotFoundError because of dst
+        self.assertRaises(err, os.copy, dir2, dst)
+        os.copy(src_file, os.path.join(dir2, 'bar'))     # should not raise exceptions
+
+
+class TestCopyFileObj(unittest.TestCase):
+    FILESIZE = 2 * 1024 * 1024
+
+    @classmethod
+    def setUpClass(cls):
+        write_test_file(TESTFN, cls.FILESIZE)
+
+    @classmethod
+    def tearDownClass(cls):
+        os_helper.unlink(TESTFN)
+        os_helper.unlink(TESTFN2)
+
+    def tearDown(self):
+        os_helper.unlink(TESTFN2)
+
+    @contextlib.contextmanager
+    def get_files(self):
+        with open(TESTFN, "rb") as src:
+            with open(TESTFN2, "wb") as dst:
+                yield (src, dst)
+
+    def assert_files_eq(self, src, dst):
+        with open(src, 'rb') as fsrc:
+            with open(dst, 'rb') as fdst:
+                self.assertEqual(fsrc.read(), fdst.read())
+
+    def test_content(self):
+        with self.get_files() as (src, dst):
+            os.copyfileobj(src, dst)
+        self.assert_files_eq(TESTFN, TESTFN2)
+
+    def test_file_not_closed(self):
+        with self.get_files() as (src, dst):
+            os.copyfileobj(src, dst)
+            assert not src.closed
+            assert not dst.closed
+
+    def test_file_offset(self):
+        with self.get_files() as (src, dst):
+            os.copyfileobj(src, dst)
+            self.assertEqual(src.tell(), self.FILESIZE)
+            self.assertEqual(dst.tell(), self.FILESIZE)
+
+    @unittest.skipIf(os.name != 'nt', "Windows only")
+    def test_win_impl(self):
+        # Make sure alternate Windows implementation is called.
+        with unittest.mock.patch("os._fastcopy_readinto") as m:
+            os.copyfile(TESTFN, TESTFN2)
+        assert m.called
+
+        # File size is 2 MiB but max buf size should be 1 MiB.
+        self.assertEqual(m.call_args[0][2], 1 * 1024 * 1024)
+
+        # If file size < 1 MiB memoryview() length must be equal to
+        # the actual file size.
+        with tempfile.NamedTemporaryFile(dir=os.getcwd(), delete=False) as f:
+            f.write(b'foo')
+        fname = f.name
+        self.addCleanup(os_helper.unlink, fname)
+        with unittest.mock.patch("os._fastcopy_readinto") as m:
+            os.copyfile(fname, TESTFN2)
+        self.assertEqual(m.call_args[0][2], 3)
+
+        # Empty files should not rely on readinto() variant.
+        with tempfile.NamedTemporaryFile(dir=os.getcwd(), delete=False) as f:
+            pass
+        fname = f.name
+        self.addCleanup(os_helper.unlink, fname)
+        with unittest.mock.patch("os._fastcopy_readinto") as m:
+            os.copyfile(fname, TESTFN2)
+        assert not m.called
+        self.assert_files_eq(fname, TESTFN2)
+
+
+class _ZeroCopyFileTest(object):
+    """Tests common to all zero-copy APIs."""
+    FILESIZE = (10 * 1024 * 1024)  # 10 MiB
+    FILEDATA = b""
+    PATCHPOINT = ""
+
+    @classmethod
+    def setUpClass(cls):
+        write_test_file(TESTFN, cls.FILESIZE)
+        with open(TESTFN, 'rb') as f:
+            cls.FILEDATA = f.read()
+            assert len(cls.FILEDATA) == cls.FILESIZE
+
+    @classmethod
+    def tearDownClass(cls):
+        os_helper.unlink(TESTFN)
+
+    def tearDown(self):
+        os_helper.unlink(TESTFN2)
+
+    @contextlib.contextmanager
+    def get_files(self):
+        with open(TESTFN, "rb") as src:
+            with open(TESTFN2, "wb") as dst:
+                yield (src, dst)
+
+    def zerocopy_fun(self, *args, **kwargs):
+        raise NotImplementedError("must be implemented in subclass")
+
+    def reset(self):
+        self.tearDown()
+        self.tearDownClass()
+        self.setUpClass()
+        self.setUp()
+
+    # ---
+
+    def test_regular_copy(self):
+        with self.get_files() as (src, dst):
+            self.zerocopy_fun(src, dst)
+        self.assertEqual(read_file(TESTFN2, binary=True), self.FILEDATA)
+        # Make sure the fallback function is not called.
+        with self.get_files() as (src, dst):
+            with unittest.mock.patch('os.copyfileobj') as m:
+                os.copyfile(TESTFN, TESTFN2)
+            assert not m.called
+
+    def test_same_file(self):
+        self.addCleanup(self.reset)
+        with self.get_files() as (src, dst):
+            with self.assertRaises((OSError, os._GiveupOnFastCopy)):
+                self.zerocopy_fun(src, src)
+        # Make sure src file is not corrupted.
+        self.assertEqual(read_file(TESTFN, binary=True), self.FILEDATA)
+
+    def test_non_existent_src(self):
+        name = tempfile.mktemp(dir=os.getcwd())
+        with self.assertRaises(FileNotFoundError) as cm:
+            os.copyfile(name, "new")
+        self.assertEqual(cm.exception.filename, name)
+
+    def test_empty_file(self):
+        srcname = TESTFN + 'src'
+        dstname = TESTFN + 'dst'
+        self.addCleanup(lambda: os_helper.unlink(srcname))
+        self.addCleanup(lambda: os_helper.unlink(dstname))
+        with open(srcname, "wb"):
+            pass
+
+        with open(srcname, "rb") as src:
+            with open(dstname, "wb") as dst:
+                self.zerocopy_fun(src, dst)
+
+        self.assertEqual(read_file(dstname, binary=True), b"")
+
+    def test_unhandled_exception(self):
+        with unittest.mock.patch(self.PATCHPOINT,
+                                 side_effect=ZeroDivisionError):
+            self.assertRaises(ZeroDivisionError,
+                              os.copyfile, TESTFN, TESTFN2)
+
+    def test_exception_on_first_call(self):
+        # Emulate a case where the first call to the zero-copy
+        # function raises an exception in which case the function is
+        # supposed to give up immediately.
+        with unittest.mock.patch(self.PATCHPOINT,
+                                 side_effect=OSError(errno.EINVAL, "yo")):
+            with self.get_files() as (src, dst):
+                with self.assertRaises(os._GiveupOnFastCopy):
+                    self.zerocopy_fun(src, dst)
+
+    def test_filesystem_full(self):
+        # Emulate a case where filesystem is full and sendfile() fails
+        # on first call.
+        with unittest.mock.patch(self.PATCHPOINT,
+                                 side_effect=OSError(errno.ENOSPC, "yo")):
+            with self.get_files() as (src, dst):
+                self.assertRaises(OSError, self.zerocopy_fun, src, dst)
+
+
+@unittest.skipIf(not SUPPORTS_SENDFILE, 'os.sendfile() not supported')
+class TestZeroCopySendfile(_ZeroCopyFileTest, unittest.TestCase):
+    PATCHPOINT = "os.sendfile"
+
+    def zerocopy_fun(self, fsrc, fdst):
+        return os._fastcopy_sendfile(fsrc, fdst)
+
+    def test_non_regular_file_src(self):
+        with io.BytesIO(self.FILEDATA) as src:
+            with open(TESTFN2, "wb") as dst:
+                with self.assertRaises(os._GiveupOnFastCopy):
+                    self.zerocopy_fun(src, dst)
+                os.copyfileobj(src, dst)
+
+        self.assertEqual(read_file(TESTFN2, binary=True), self.FILEDATA)
+
+    def test_non_regular_file_dst(self):
+        with open(TESTFN, "rb") as src:
+            with io.BytesIO() as dst:
+                with self.assertRaises(os._GiveupOnFastCopy):
+                    self.zerocopy_fun(src, dst)
+                os.copyfileobj(src, dst)
+                dst.seek(0)
+                self.assertEqual(dst.read(), self.FILEDATA)
+
+    def test_exception_on_second_call(self):
+        def sendfile(*args, **kwargs):
+            if not flag:
+                flag.append(None)
+                return orig_sendfile(*args, **kwargs)
+            else:
+                raise OSError(errno.EBADF, "yo")
+
+        flag = []
+        orig_sendfile = os.sendfile
+        with unittest.mock.patch('os.sendfile', create=True,
+                                 side_effect=sendfile):
+            with self.get_files() as (src, dst):
+                with self.assertRaises(OSError) as cm:
+                    os._fastcopy_sendfile(src, dst)
+        assert flag
+        self.assertEqual(cm.exception.errno, errno.EBADF)
+
+    def test_cant_get_size(self):
+        # Emulate a case where src file size cannot be determined.
+        # Internally bufsize will be set to a small value and
+        # sendfile() will be called repeatedly.
+        with unittest.mock.patch('os.fstat', side_effect=OSError) as m:
+            with self.get_files() as (src, dst):
+                os._fastcopy_sendfile(src, dst)
+                assert m.called
+        self.assertEqual(read_file(TESTFN2, binary=True), self.FILEDATA)
+
+    def test_small_chunks(self):
+        # Force internal file size detection to be smaller than the
+        # actual file size. We want to force sendfile() to be called
+        # multiple times, also in order to emulate a src fd which gets
+        # bigger while it is being copied.
+        mock = unittest.mock.Mock()
+        mock.st_size = 65536 + 1
+        with unittest.mock.patch('os.fstat', return_value=mock) as m:
+            with self.get_files() as (src, dst):
+                os._fastcopy_sendfile(src, dst)
+                assert m.called
+        self.assertEqual(read_file(TESTFN2, binary=True), self.FILEDATA)
+
+    def test_big_chunk(self):
+        # Force internal file size detection to be +100MB bigger than
+        # the actual file size. Make sure sendfile() does not rely on
+        # file size value except for (maybe) a better throughput /
+        # performance.
+        mock = unittest.mock.Mock()
+        mock.st_size = self.FILESIZE + (100 * 1024 * 1024)
+        with unittest.mock.patch('os.fstat', return_value=mock) as m:
+            with self.get_files() as (src, dst):
+                os._fastcopy_sendfile(src, dst)
+                assert m.called
+        self.assertEqual(read_file(TESTFN2, binary=True), self.FILEDATA)
+
+    def test_blocksize_arg(self):
+        with unittest.mock.patch('os.sendfile',
+                                 side_effect=ZeroDivisionError) as m:
+            self.assertRaises(ZeroDivisionError,
+                              os.copyfile, TESTFN, TESTFN2)
+            blocksize = m.call_args[0][3]
+            # Make sure file size and the block size arg passed to
+            # sendfile() are the same.
+            self.assertEqual(blocksize, os.path.getsize(TESTFN))
+            # ...unless we're dealing with a small file.
+            os_helper.unlink(TESTFN2)
+            write_file(TESTFN2, b"hello", binary=True)
+            self.addCleanup(os_helper.unlink, TESTFN2 + '3')
+            self.assertRaises(ZeroDivisionError,
+                              os.copyfile, TESTFN2, TESTFN2 + '3')
+            blocksize = m.call_args[0][3]
+            self.assertEqual(blocksize, 2 ** 23)
+
+    def test_file2file_not_supported(self):
+        # Emulate a case where sendfile() only support file->socket
+        # fds. In such a case copyfile() is supposed to skip the
+        # fast-copy attempt from then on.
+        assert os._USE_CP_SENDFILE
+        try:
+            with unittest.mock.patch(
+                    self.PATCHPOINT,
+                    side_effect=OSError(errno.ENOTSOCK, "yo")) as m:
+                with self.get_files() as (src, dst):
+                    with self.assertRaises(os._GiveupOnFastCopy):
+                        os._fastcopy_sendfile(src, dst)
+                assert m.called
+            assert not os._USE_CP_SENDFILE
+
+            with unittest.mock.patch(self.PATCHPOINT) as m:
+                os.copyfile(TESTFN, TESTFN2)
+                assert not m.called
+        finally:
+            os._USE_CP_SENDFILE = True
+
+
+@unittest.skipIf(not MACOS, 'macOS only')
+class TestZeroCopyMACOS(_ZeroCopyFileTest, unittest.TestCase):
+    PATCHPOINT = "os._fcopyfile"
+
+    def zerocopy_fun(self, src, dst):
+        return os._fastcopy_fcopyfile(src, dst, os._COPYFILE_DATA)
 
 
 if __name__ == "__main__":
