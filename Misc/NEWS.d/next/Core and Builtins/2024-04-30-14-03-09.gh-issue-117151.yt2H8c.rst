@@ -1,0 +1,3 @@
+increase io.DEFAULT_BUFFER_SIZE from 4k/8k to 128k. fix open on Linux to use
+max(io.DEFAULT_BUFFER_SIZE, device block size) rather than the device block
+size. improve I/O performance by 3 to 5 times. patch by Romain Morotti.
