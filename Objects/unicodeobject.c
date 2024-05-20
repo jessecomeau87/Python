@@ -13369,6 +13369,15 @@ PyUnicodeWriter_WriteSubstring(PyUnicodeWriter *writer, PyObject *str,
         PyErr_Format(PyExc_TypeError, "expect str, not %T", str);
         return -1;
     }
+    if (start < 0 || start > end) {
+        PyErr_Format(PyExc_ValueError, "invalid start argument");
+        return -1;
+    }
+    if (end > PyUnicode_GET_LENGTH(str)) {
+        PyErr_Format(PyExc_ValueError, "invalid end argument");
+        return -1;
+    }
+
     return _PyUnicodeWriter_WriteSubstring((_PyUnicodeWriter*)writer, str,
                                            start, end);
 }

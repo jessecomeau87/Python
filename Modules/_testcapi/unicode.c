@@ -221,6 +221,92 @@ unicode_copycharacters(PyObject *self, PyObject *args)
 }
 
 
+static PyObject *
+test_unicodewriter(PyObject *self, PyObject *Py_UNUSED(args))
+{
+    PyUnicodeWriter *writer = PyUnicodeWriter_Create();
+    if (writer == NULL) {
+        return NULL;
+    }
+
+    // test PyUnicodeWriter_SetOverallocate()
+    PyUnicodeWriter_SetOverallocate(writer, 1);
+
+    // test PyUnicodeWriter_WriteStr()
+    PyObject *str = PyUnicode_FromString("var");
+    if (str == NULL) {
+        goto error;
+    }
+    int ret = PyUnicodeWriter_WriteStr(writer, str);
+    Py_CLEAR(str);
+    if (ret < 0) {
+        goto error;
+    }
+
+    // test PyUnicodeWriter_WriteChar()
+    if (PyUnicodeWriter_WriteChar(writer, '=') < 0) {
+        goto error;
+    }
+
+    // test PyUnicodeWriter_WriteSubstring()
+    str = PyUnicode_FromString("[value]");
+    if (str == NULL) {
+        goto error;
+    }
+    ret = PyUnicodeWriter_WriteSubstring(writer, str, 1, 6);
+    Py_CLEAR(str);
+    if (ret < 0) {
+        goto error;
+    }
+
+    PyObject *result = PyUnicodeWriter_Finish(writer);
+    if (result == NULL) {
+        return NULL;
+    }
+    assert(PyUnicode_EqualToUTF8(result, "var=value"));
+    Py_DECREF(result);
+
+    Py_RETURN_NONE;
+
+error:
+    PyUnicodeWriter_Free(writer);
+    return NULL;
+}
+
+
+static PyObject *
+test_unicodewriter_format(PyObject *self, PyObject *Py_UNUSED(args))
+{
+    PyUnicodeWriter *writer = PyUnicodeWriter_Create();
+    if (writer == NULL) {
+        return NULL;
+    }
+
+    // test PyUnicodeWriter_Format()
+    if (PyUnicodeWriter_Format(writer, "%s %i", "Hello", 123) < 0) {
+        goto error;
+    }
+
+    // test PyUnicodeWriter_WriteChar()
+    if (PyUnicodeWriter_WriteChar(writer, '.') < 0) {
+        goto error;
+    }
+
+    PyObject *result = PyUnicodeWriter_Finish(writer);
+    if (result == NULL) {
+        return NULL;
+    }
+    assert(PyUnicode_EqualToUTF8(result, "Hello 123."));
+    Py_DECREF(result);
+
+    Py_RETURN_NONE;
+
+error:
+    PyUnicodeWriter_Free(writer);
+    return NULL;
+}
+
+
 static PyMethodDef TestMethods[] = {
     {"unicode_new",              unicode_new,                    METH_VARARGS},
     {"unicode_fill",             unicode_fill,                   METH_VARARGS},
@@ -229,6 +315,8 @@ static PyMethodDef TestMethods[] = {
     {"unicode_asucs4copy",       unicode_asucs4copy,             METH_VARARGS},
     {"unicode_asutf8",           unicode_asutf8,                 METH_VARARGS},
     {"unicode_copycharacters",   unicode_copycharacters,         METH_VARARGS},
+    {"test_unicodewriter",       test_unicodewriter,             METH_NOARGS},
+    {"test_unicodewriter_format", test_unicodewriter_format,     METH_NOARGS},
     {NULL},
 };
 
