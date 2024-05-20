@@ -3,6 +3,7 @@ import ntpath
 import operator
 import os
 import posixpath
+import shutil
 import sys
 from glob import _StringGlobber
 from itertools import chain
@@ -743,6 +744,24 @@ class Path(PathBase, PurePath):
             # could give priority to other errors like EACCES or EROFS
             if not exist_ok or not self.is_dir():
                 raise
+
+    def copy(self, target, follow_symlinks=True):
+        """
+        Copy this file and its metadata to the given target. Returns the path
+        of the new file.
+
+        If this file is a symlink and *follow_symlinks* is true (the default),
+        the symlink's target is copied. Otherwise, the symlink is recreated at
+        the target.
+        """
+        if not isinstance(target, PathBase):
+            target = self.with_segments(target)
+        if isinstance(target, Path):
+            # The source and target are *local* paths, so use shutil.copy2()
+            # to efficiently copy data and metadata using available OS APIs.
+            target = shutil.copy2(self, target, follow_symlinks=follow_symlinks)
+            return self.with_segments(target)
+        return PathBase.copy(self, target, follow_symlinks=follow_symlinks)
 
     def chmod(self, mode, *, follow_symlinks=True):
         """
