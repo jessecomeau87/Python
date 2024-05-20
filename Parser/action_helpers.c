@@ -554,9 +554,6 @@ _make_posargs(Parser *p,
     else if (plain_names == NULL && names_with_default != NULL) {
         *posargs = _get_names(p, names_with_default);
     }
-    else if (plain_names != NULL && names_with_default == NULL) {
-        *posargs = plain_names;
-    }
     else {
         *posargs = _Py_asdl_arg_seq_new(0, p->arena);
     }
