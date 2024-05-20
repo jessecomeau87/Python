@@ -1,0 +1,1 @@
+fractions.Fraction.__pow__ no longer coerces itself to float for unrecognized exponent types, instead returning NotImplemented to defer to the exponent's __rpow__ as normal.
