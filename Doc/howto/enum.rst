@@ -1116,7 +1116,7 @@ are comprised of a single bit::
 ``Flag`` and ``IntFlag`` minutia
 """"""""""""""""""""""""""""""""
 
-Using the following snippet for our examples::
+Using the following snippets for our examples::
 
     >>> class Color(IntFlag):
     ...     BLACK = 0
@@ -1125,6 +1125,11 @@ Using the following snippet for our examples::
     ...     BLUE = 4
     ...     PURPLE = RED | BLUE
     ...     WHITE = RED | GREEN | BLUE
+    ...
+    >>> class Perm(IntFlag):
+    ...     R = 4
+    ...     W = 2
+    ...     X = 1
     ...
 
 the following are true:
@@ -1149,6 +1154,8 @@ the following are true:
 
     >>> (Color.RED | Color.GREEN).name
     'RED|GREEN'
+    >>> (Perm.R & Perm.W).name is None                   # effectively `Perm(0)`
+    True
 
 - multi-bit flags, aka aliases, can be returned from operations::
 
