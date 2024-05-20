@@ -2858,23 +2858,21 @@ unicode_fromformat_arg(_PyUnicodeWriter *writer,
     return f;
 }
 
-PyObject *
-PyUnicode_FromFormatV(const char *format, va_list vargs)
+static int
+unicode_from_format(_PyUnicodeWriter *writer, const char *format, va_list vargs)
 {
+    writer->min_length += strlen(format) + 100;
+    writer->overallocate = 1;
+
     va_list vargs2;
     const char *f;
-    _PyUnicodeWriter writer;
-
-    _PyUnicodeWriter_Init(&writer);
-    writer.min_length = strlen(format) + 100;
-    writer.overallocate = 1;
 
     // Copy varags to be able to pass a reference to a subfunction.
     va_copy(vargs2, vargs);
 
     for (f = format; *f; ) {
         if (*f == '%') {
-            f = unicode_fromformat_arg(&writer, f, &vargs2);
+            f = unicode_fromformat_arg(writer, f, &vargs2);
             if (f == NULL)
                 goto fail;
         }
@@ -2898,21 +2896,33 @@ PyUnicode_FromFormatV(const char *format, va_list vargs)
             len = p - f;
 
             if (*p == '\0')
-                writer.overallocate = 0;
+                writer->overallocate = 0;
 
-            if (_PyUnicodeWriter_WriteASCIIString(&writer, f, len) < 0)
+            if (_PyUnicodeWriter_WriteASCIIString(writer, f, len) < 0)
                 goto fail;
 
             f = p;
         }
     }
     va_end(vargs2);
-    return _PyUnicodeWriter_Finish(&writer);
+    return 0;
 
   fail:
     va_end(vargs2);
-    _PyUnicodeWriter_Dealloc(&writer);
-    return NULL;
+    return -1;
+}
+
+PyObject *
+PyUnicode_FromFormatV(const char *format, va_list vargs)
+{
+    _PyUnicodeWriter writer;
+    _PyUnicodeWriter_Init(&writer);
+
+    if (unicode_from_format(&writer, format, vargs) < 0) {
+        _PyUnicodeWriter_Dealloc(&writer);
+        return NULL;
+    }
+    return _PyUnicodeWriter_Finish(&writer);
 }
 
 PyObject *
@@ -2923,6 +2933,18 @@ PyUnicode_FromFormat(const char *format, ...)
 
     va_start(vargs, format);
     ret = PyUnicode_FromFormatV(format, vargs);
+    va_end(vargs);
+    return ret;
+}
+
+int
+PyUnicodeWriter_Format(PyUnicodeWriter *writer, const char *format, ...)
+{
+    _PyUnicodeWriter *_writer = (_PyUnicodeWriter*)writer;
+
+    va_list vargs;
+    va_start(vargs, format);
+    int ret = unicode_from_format(_writer, format, vargs);
     va_end(vargs);
     return ret;
 }
@@ -13098,9 +13120,9 @@ _PyUnicodeWriter_Init(_PyUnicodeWriter *writer)
     /* ASCII is the bare minimum */
     writer->min_char = 127;
 
-    /* use a value smaller than PyUnicode_1BYTE_KIND() so
+    /* use a kind value smaller than PyUnicode_1BYTE_KIND so
        _PyUnicodeWriter_PrepareKind() will copy the buffer. */
-    writer->kind = 0;
+    assert(writer->kind == 0);
     assert(writer->kind <= PyUnicode_1BYTE_KIND);
 }
 

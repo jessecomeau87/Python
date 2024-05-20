@@ -470,6 +470,10 @@ PyAPI_FUNC(int) PyUnicodeWriter_WriteSubstring(
     PyObject *str,
     Py_ssize_t start,
     Py_ssize_t stop);
+PyAPI_FUNC(int) PyUnicodeWriter_Format(
+    PyUnicodeWriter *writer,
+    const char *format,
+    ...);
 
 /* --- Manage the default encoding ---------------------------------------- */
 
